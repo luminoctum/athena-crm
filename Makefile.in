@@ -9,7 +9,6 @@ PROBLEM_FILE = @PROBLEM_FILE@
 RECONSTRUCT_FILE = @RECONSTRUCT_FILE@
 RSOLVER_FILE = @RSOLVER_FILE@
 RSOLVER_DIR = @RSOLVER_DIR@
-HYDRO_INT_FILE = @HYDRO_INT_FILE@
 
 # General compiler specifications
 
@@ -33,7 +32,9 @@ SRC_FILES := $(wildcard src/*.cpp) \
 	     src/hydro/rsolvers/$(RSOLVER_DIR)$(RSOLVER_FILE) \
 	     $(wildcard src/mesh/*.cpp) \
 	     $(wildcard src/outputs/*.cpp) \
-	     $(wildcard src/reconstruct/*.cpp) \
+			 src/reconstruct/reconstruction.cpp \
+			 src/reconstruct/dc.cpp \
+			 src/reconstruct/$(RECONSTRUCT_FILE) \
 	     $(wildcard src/task_list/*.cpp) \
 	     $(wildcard src/utils/*.cpp) \
 	     src/pgen/$(PROBLEM_FILE) \

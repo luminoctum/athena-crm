@@ -9,10 +9,21 @@
 //  \brief prototypes of functions and class definitions for utils/*.cpp files
 
 #include <csignal>
+#include <string>
+#include <vector>
+#include <map>
 
 void ChangeRunDir(const char *pdir);
 double ran2(long int *idum);
 void ShowConfig();
+
+bool IsFileExist(std::string fname);
+std::string DecommentFile(std::string fname);
+void SplitString(std::string str, std::vector<std::string>& result);
+int GetNumCols(std::string fname, char c = ' ');
+int GetNumRows(std::string fname);
+typedef std::map<std::string, std::vector<double> > NamedArray;
+NamedArray ReadNamedArray(std::string fname);
 
 //----------------------------------------------------------------------------------------
 //! SignalHandler

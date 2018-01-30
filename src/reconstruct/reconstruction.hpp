@@ -24,17 +24,17 @@ public:
   Reconstruction(MeshBlock *pmb, ParameterInput *pin);
   ~Reconstruction();
 
-  void PiecewiseLinearX1(const int k, const int j,
+  void HighResFuncX1(const int k, const int j,
     const int il, const int iu,
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
 
-  void PiecewiseLinearX2(const int k, const int j,
+  void HighResFuncX2(const int k, const int j,
     const int il, const int iu,
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
 
-  void PiecewiseLinearX3(const int k, const int j,
+  void HighResFuncX3(const int k, const int j,
     const int il, const int iu,
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
@@ -56,5 +56,6 @@ public:
 
 private:
   MeshBlock *pmy_block_;  // ptr to MeshBlock containing this Reconstruction
+  AthenaArray<Real> c1_, c2_, c3_, c4_, c5_, c6_, dd, dph;
 };
 #endif // RECONSTRUCTION_HPP

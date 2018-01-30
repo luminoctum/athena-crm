@@ -13,7 +13,6 @@
 #   --eos=choice      use choice as the equation of state
 #   --flux=choice     use choice as the Riemann solver
 #   --order=choice    use choice as the spatial reconstruction algorithm
-#   --fint=choice     use choice as the hydro time-integration algorithm
 #   -b                enable magnetic fields
 #   -s                enable special relativity
 #   -g                enable general relativity
@@ -22,7 +21,9 @@
 #   -mpi              enable parallelization with MPI
 #   -omp              enable parallelization with OpenMP
 #   -hdf5             enable HDF5 output (requires the HDF5 library)
+#   -netcdf           enable NETCDF output (requires the NETCDF library)
 #   --hdf5_path=path  path to HDF5 libraries (requires the HDF5 library)
+#   --netcdf_path=path path to NETCDF libraries (requires the NETCDF library)
 #   --cxx=choice      use choice as the C++ compiler
 #   --ccmd=choice     use choice as the command to call the C++ compiler
 #---------------------------------------------------------------------------------------
@@ -68,20 +69,14 @@ parser.add_argument('--eos',
 # --flux=[name] argument
 parser.add_argument('--flux',
     default='default',
-    choices=['default','hlle','hllc','hlld','roe','llf'],
+    choices=['default','hlle','hllc','hlld','roe','llf','lmars'],
     help='select Riemann solver')
 
 # --order=[name] argument
 parser.add_argument('--order',
     default='plm',
-    choices=['plm'],
+    choices=['plm','weno3','weno5','cp3','cp5'],
     help='select spatial reconstruction algorithm')
-
-# --fint=[name] argument
-parser.add_argument('--fint',
-    default='vl2',
-    choices=['vl2'],
-    help='select hydro time-integration algorithm')
 
 # -b argument
 parser.add_argument('-b',
@@ -131,11 +126,23 @@ parser.add_argument('-hdf5',
     default=False,
     help='enable HDF5 Output')
 
+# -netcdf argument
+parser.add_argument('-netcdf',
+    action='store_true',
+    default=False,
+    help='enable NETCDF Output')
+
 # --hdf5_path argument
 parser.add_argument('--hdf5_path',
     type=str,
     default='',
     help='path to HDF5 libraries')
+
+# --netcdf_path argument
+parser.add_argument('--netcdf_path',
+    type=str,
+    default='',
+    help='path to NETCDF libraries')
 
 # --cxx=[name] argument
 parser.add_argument('--cxx',
@@ -206,6 +213,9 @@ definitions['PROBLEM'] = makefile_options['PROBLEM_FILE'] = args['prob']
 definitions['COORDINATE_SYSTEM'] = makefile_options['COORDINATES_FILE'] = args['coord']
 
 # --eos=[name] argument
+definitions['EQUATION_OF_STATE'] = makefile_options['EOS_FILE'] = args['eos']
+
+# --eos=[name] argument
 definitions['NON_BAROTROPIC_EOS'] = '1' if args['eos'] == 'adiabatic' else '0'
 makefile_options['EOS_FILE'] = args['eos']
 # set number of hydro variables for adiabatic/isothermal
@@ -219,9 +229,10 @@ definitions['RSOLVER'] = makefile_options['RSOLVER_FILE'] = args['flux']
 
 # --order=[name] argument
 definitions['RECONSTRUCT'] = makefile_options['RECONSTRUCT_FILE'] = args['order']
-
-# --fint=[name] argument
-definitions['HYDRO_INTEGRATOR'] = makefile_options['HYDRO_INT_FILE'] = args['fint']
+if args['order'] in ['weno5','cp5']:
+  definitions['NGHOST_VALUE'] = '3'
+else:
+  definitions['NGHOST_VALUE'] = '2'
 
 # -b argument
 # set variety of macros based on whether MHD/hydro or adi/iso are defined
@@ -362,6 +373,17 @@ if args['hdf5']:
 else:
   definitions['HDF5_OPTION'] = 'NO_HDF5OUTPUT'
 
+# -netcdf argument
+if args['netcdf']:
+  definitions['NETCDF_OPTION'] = 'NETCDFOUTPUT'
+  if args['netcdf_path'] != '':
+    makefile_options['PREPROCESSOR_FLAGS'] += ' -I%s/include' % args['netcdf_path']
+    makefile_options['LINKER_FLAGS'] += ' -L%s/lib' % args['netcdf_path']
+  if args['cxx'] == 'g++' or args['cxx'] == 'icc' or args['cxx'] == 'cray':
+    makefile_options['LIBRARY_FLAGS'] += ' -lnetcdf'
+else:
+  definitions['NETCDF_OPTION'] = 'NO_NETCDFOUTPUT'
+
 # --ccmd=[name] argument
 if args['ccmd'] is not None:
   definitions['COMPILER_COMMAND'] = makefile_options['COMPILER_COMMAND'] = args['ccmd']
@@ -378,7 +400,6 @@ makefile_options['COORDINATES_FILE'] += '.cpp'
 makefile_options['EOS_FILE'] += '.cpp'
 makefile_options['RSOLVER_FILE'] += '.cpp'
 makefile_options['RECONSTRUCT_FILE'] += '.cpp'
-makefile_options['HYDRO_INT_FILE'] += '.cpp'
 
 # Read templates
 with open(defsfile_input, 'r') as current_file:
@@ -405,7 +426,6 @@ print('  Coordinate system:       ' + args['coord'])
 print('  Equation of state:       ' + args['eos'])
 print('  Riemann solver:          ' + args['flux'])
 print('  Reconstruction method:   ' + args['order'])
-print('  Hydro integrator:        ' + args['fint'])
 print('  Magnetic fields:         ' + ('ON' if args['b'] else 'OFF'))
 print('  Special relativity:      ' + ('ON' if args['s'] else 'OFF'))
 print('  General relativity:      ' + ('ON' if args['g'] else 'OFF'))
@@ -416,6 +436,7 @@ print('  Linker flags:            ' + makefile_options['LINKER_FLAGS'] + ' ' \
 print('  MPI parallelism:         ' + ('ON' if args['mpi'] else 'OFF'))
 print('  OpenMP parallelism:      ' + ('ON' if args['omp'] else 'OFF'))
 print('  HDF5 output:             ' + ('ON' if args['hdf5'] else 'OFF'))
+print('  NETCDF output:           ' + ('ON' if args['netcdf'] else 'OFF'))
 print('  Compiler:                ' + args['cxx'])
 print('  Compilation command:     ' + makefile_options['COMPILER_COMMAND'] + ' ' \
     + makefile_options['PREPROCESSOR_FLAGS'] + ' ' + makefile_options['COMPILER_FLAGS'])

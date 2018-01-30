@@ -44,6 +44,8 @@ public:
   void RiemannSolver(const int k, const int j, const int il, const int iu,
     const int ivx, const AthenaArray<Real> &bx, AthenaArray<Real> &wl,
     AthenaArray<Real> &wr, AthenaArray<Real> &flx);
+  void DecomposePressure(AthenaArray<Real> &w);
+  void AssemblePressure(AthenaArray<Real> &w);
 
 private:
   AthenaArray<Real> dt1_,dt2_,dt3_;  // scratch arrays used in NewTimeStep
@@ -60,6 +62,10 @@ private:
   AthenaArray<Real> lambdas_m_r_;  // most negative wavespeeds in right state
   AthenaArray<Real> g_, gi_;       // metric and inverse, for some GR Riemann solvers
   AthenaArray<Real> cons_;         // conserved state, for some GR Riemann solvers
+
+  // pressure decomposition
+  AthenaArray<Real> psi_;       // hydrostatic pressure at cell interface
+  AthenaArray<Real> ps_;        // hydrostatic pressure
 
   TimeStepFunc_t UserTimeStep_;
 };

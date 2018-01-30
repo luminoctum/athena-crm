@@ -79,6 +79,10 @@ Hydro::Hydro(MeshBlock *pmb, ParameterInput *pin)
 
   // Construct ptrs to objects of various classes needed to integrate hydro/MHD eqns 
   psrc  = new HydroSourceTerms(this,pin);
+
+  // allocate hydrostatic and nonhydrostatic pressure
+  psi_.NewAthenaArray(ncells3, ncells2, ncells1 + 1);
+  ps_.NewAthenaArray(ncells3, ncells2, ncells1);
 }
 
 // destructor
@@ -127,4 +131,7 @@ Hydro::~Hydro()
   }
 
   delete psrc;
+
+  psi_.DeleteAthenaArray();
+  ps_.DeleteAthenaArray();
 }

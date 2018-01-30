@@ -18,7 +18,7 @@
 //! \fn Reconstruction::ReconstructionFuncX1()
 //  \brief 
 
-void Reconstruction::PiecewiseLinearX1(const int k, const int j,
+void Reconstruction::HighResFuncX1(const int k, const int j,
   const int il, const int iu,
   const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &ql, AthenaArray<Real> &qr)
@@ -132,7 +132,7 @@ void Reconstruction::PiecewiseLinearX1(const int k, const int j,
 //! \fn Reconstruction::ReconstructionFuncX2()
 //  \brief 
 
-void Reconstruction::PiecewiseLinearX2(const int k, const int j,
+void Reconstruction::HighResFuncX2(const int k, const int j,
   const int il, const int iu,
   const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &ql, AthenaArray<Real> &qr)
@@ -221,7 +221,7 @@ void Reconstruction::PiecewiseLinearX2(const int k, const int j,
 //! \fn Reconstruction::ReconstructionFuncX3()
 //  \brief 
 
-void Reconstruction::PiecewiseLinearX3(const int k, const int j,
+void Reconstruction::HighResFuncX3(const int k, const int j,
   const int il, const int iu,
   const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
   AthenaArray<Real> &ql, AthenaArray<Real> &qr)

@@ -35,7 +35,7 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm)
   // a,b=(1-a),and c are weights that are different for each step and each integrator
   // These are stored as: time_int_wght1 = a, time_int_wght2 = b, time_int_wght3 = c
 
-  integrator = pin->GetOrAddString("time","integrator","vl2");
+  integrator = pin->GetOrAddString("time","integrator","rk3");
 
   // second-order van Leer integrator (Gardiner & Stone, NewA 14, 139 2009)
   if (integrator == "vl2") {
@@ -56,6 +56,19 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm)
     step_wghts[1].a = 0.5;
     step_wghts[1].b = 0.5;
     step_wghts[1].c = 0.5;
+  } else if (integrator == "rk3") {
+    nsub_steps = 3;
+    step_wghts[0].a = 1.0;
+    step_wghts[0].b = 0.0;
+    step_wghts[0].c = 1.0;
+
+    step_wghts[1].a = 0.75;
+    step_wghts[1].b = 0.25;
+    step_wghts[1].c = 0.25;
+
+    step_wghts[2].a = 1./3.;
+    step_wghts[2].b = 2./3.;
+    step_wghts[2].c = 2./3.;
   } else {
     std::stringstream msg;
     msg << "### FATAL ERROR in CreateTimeIntegrator" << std::endl
@@ -283,18 +296,15 @@ enum TaskStatus TimeIntegratorTaskList::CalculateFluxes(MeshBlock *pmb, int step
   Hydro *phydro=pmb->phydro;
   Field *pfield=pmb->pfield;
 
-  if((step == 1) && (integrator == "vl2")) {
-    phydro->CalculateFluxes(phydro->w,  pfield->b,  pfield->bcc, 1);
+  if (step == 1) {
+    // use first order reconstruction if vl2 integrator and first step
+    if (integrator == "vl2")
+      phydro->CalculateFluxes(phydro->w,  pfield->b,  pfield->bcc, true);
+    else
+      phydro->CalculateFluxes(phydro->w,  pfield->b,  pfield->bcc, false);
     return TASK_NEXT;
-  }
-
-  if((step == 1) && (integrator == "rk2")) {
-    phydro->CalculateFluxes(phydro->w,  pfield->b,  pfield->bcc, 2);
-    return TASK_NEXT;
-  } 
-
-  if(step == 2) {
-    phydro->CalculateFluxes(phydro->w1, pfield->b1, pfield->bcc1, 2);
+  } else {
+    phydro->CalculateFluxes(phydro->w1, pfield->b1, pfield->bcc1, false);
     return TASK_NEXT;
   }
 
@@ -361,18 +371,14 @@ enum TaskStatus TimeIntegratorTaskList::HydroIntegrate(MeshBlock *pmb, int step)
   Field *pf=pmb->pfield;
 
   if(step == 1) {
-    ph->AddFluxDivergenceToAverage(ph->u,ph->u,ph->w,pf->bcc,step_wghts[0],ph->u1);
+    ph->AddFluxDivergenceToAverage(ph->u,ph->u,ph->w,pf->bcc,step_wghts[step-1],ph->u1);
     return TASK_NEXT;
-  }
-
-  if((step == 2) && (integrator == "vl2")) {
-    ph->AddFluxDivergenceToAverage(ph->u,ph->u,ph->w1,pf->bcc1,step_wghts[1],ph->u);
+  } else if (step == nsub_steps) {
+    ph->AddFluxDivergenceToAverage(ph->u,ph->u1,ph->w1,pf->bcc1,step_wghts[step-1],ph->u);
     return TASK_NEXT;
-  }
-
-  if((step == 2) && (integrator == "rk2")) {
-   ph->AddFluxDivergenceToAverage(ph->u,ph->u1,ph->w1,pf->bcc1,step_wghts[1],ph->u);
-   return TASK_NEXT;
+  } else {
+    ph->AddFluxDivergenceToAverage(ph->u,ph->u1,ph->w1,pf->bcc1,step_wghts[step-1],ph->u1);
+    return TASK_NEXT;
   }
 
   return TASK_FAIL;
@@ -411,16 +417,16 @@ enum TaskStatus TimeIntegratorTaskList::HydroSourceTerms(MeshBlock *pmb, int ste
 
   Real dt = (step_wghts[(step-1)].c)*(pmb->pmy_mesh->dt);
   Real time;
-  // *** this must be changed for the RK3 integrator
-  if(step == 1) {
+
+  if (step == 1) {
     time=pmb->pmy_mesh->time;
     ph->psrc->AddHydroSourceTerms(time,dt,ph->flux,ph->w,pf->bcc,ph->u1);
-  } else if(step == 2) {
-    if      (integrator == "vl2") time=pmb->pmy_mesh->time + 0.5*pmb->pmy_mesh->dt;
-    else if (integrator == "rk2") time=pmb->pmy_mesh->time +     pmb->pmy_mesh->dt;
+  } else if (step == nsub_steps) {
+    time = pmb->pmy_mesh->time + (step_wghts[step-2].c)*pmb->pmy_mesh->dt;
     ph->psrc->AddHydroSourceTerms(time,dt,ph->flux,ph->w1,pf->bcc1,ph->u);
   } else {
-    return TASK_FAIL;
+    time = pmb->pmy_mesh->time + (step_wghts[step-2].c)*pmb->pmy_mesh->dt;
+    ph->psrc->AddHydroSourceTerms(time,dt,ph->flux,ph->w1,pf->bcc1,ph->u1);
   }
 
   return TASK_NEXT;
@@ -431,13 +437,12 @@ enum TaskStatus TimeIntegratorTaskList::HydroSourceTerms(MeshBlock *pmb, int ste
 
 enum TaskStatus TimeIntegratorTaskList::HydroSend(MeshBlock *pmb, int step)
 {
-  if(step == 1) {
+  if(step != nsub_steps) {
     pmb->pbval->SendHydroBoundaryBuffers(pmb->phydro->u1, true);
-  } else if(step == 2) {
+  } else { // last step
     pmb->pbval->SendHydroBoundaryBuffers(pmb->phydro->u, true);
-  } else {
-    return TASK_FAIL;
   }
+
   return TASK_SUCCESS;
 }
 
@@ -459,12 +464,10 @@ enum TaskStatus TimeIntegratorTaskList::FieldSend(MeshBlock *pmb, int step)
 enum TaskStatus TimeIntegratorTaskList::HydroReceive(MeshBlock *pmb, int step)
 {
   bool ret;
-  if(step == 1) {
+  if(step != nsub_steps) {
     ret=pmb->pbval->ReceiveHydroBoundaryBuffers(pmb->phydro->u1);
-  } else if(step == 2) {
+  } else { // last step
     ret=pmb->pbval->ReceiveHydroBoundaryBuffers(pmb->phydro->u);
-  } else {
-    return TASK_FAIL;
   }
   if(ret==true) {
     return TASK_SUCCESS;
@@ -526,17 +529,16 @@ enum TaskStatus TimeIntegratorTaskList::Primitives(MeshBlock *pmb, int step)
   if(pmb->nblevel[0][1][1]!=-1) ks-=NGHOST;
   if(pmb->nblevel[2][1][1]!=-1) ke+=NGHOST;
 
-  if(step == 1) {
+  if(step != nsub_steps) {
     pmb->peos->ConservedToPrimitive(phydro->u1, phydro->w, pfield->b1,
                                     phydro->w1, pfield->bcc1, pmb->pcoord,
                                     is, ie, js, je, ks, ke);
-  } else if(step == 2) {
+  } else {  // last step
     pmb->peos->ConservedToPrimitive(phydro->u, phydro->w1, pfield->b,
                                     phydro->w, pfield->bcc, pmb->pcoord,
                                     is, ie, js, je, ks, ke);
-  } else {
-    return TASK_FAIL;
   }
+
   return TASK_SUCCESS;
 }
 
@@ -546,17 +548,16 @@ enum TaskStatus TimeIntegratorTaskList::PhysicalBoundary(MeshBlock *pmb, int ste
   Field *pfield=pmb->pfield;
   BoundaryValues *pbval=pmb->pbval;
   Real dt;
-  if(step == 1) {
+  if(step != nsub_steps) {
     dt = (step_wghts[(step-1)].c)*(pmb->pmy_mesh->dt);
     pbval->ApplyPhysicalBoundaries(phydro->w1, phydro->u1, pfield->b1, pfield->bcc1,
                                    pmb->pmy_mesh->time+dt, dt);
-  } else if(step == 2) {
+  } else {  // last step
     dt=pmb->pmy_mesh->dt;
     pbval->ApplyPhysicalBoundaries(phydro->w,  phydro->u,  pfield->b,  pfield->bcc,
                                    pmb->pmy_mesh->time+dt, dt);
-  } else {
-    return TASK_FAIL;
   }
+
   return TASK_SUCCESS;
 }
 

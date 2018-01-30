@@ -68,6 +68,9 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
 
 //----------------------------------------------------------------------------------------
 // i-direction
+  // decompose pressure to pertubation pressure and hydrostatic pressure
+  DecomposePressure(w);
+
   // set the loop limits
   jl=js, ju=je, kl=ks, ku=ke;
   if (MAGNETIC_FIELDS_ENABLED) {
@@ -86,7 +89,13 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
       if (reconstruct_order == 1) {
         pmb->precon->DonorCellX1(k,j,is,ie+1,w,bcc,wl,wr);
       } else {
-        pmb->precon->PiecewiseLinearX1(k,j,is,ie+1,w,bcc,wl,wr);
+        pmb->precon->HighResFuncX1(k,j,is,ie+1,w,bcc,wl,wr);
+      }
+
+      // add hydrostatic pressure
+      for (int i = is; i <= ie + 1; ++i) {
+        wl(IPR,i) += psi_(k,j,i);
+        wr(IPR,i) += psi_(k,j,i);
       }
 
       // compute fluxes
@@ -118,6 +127,9 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
     }
   }
 
+  // assemble pressure pertubation
+  AssemblePressure(w);
+
 //----------------------------------------------------------------------------------------
 // j-direction
 
@@ -138,7 +150,7 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
         if (reconstruct_order == 1) {
           pmb->precon->DonorCellX2(k,j,il,iu,w,bcc,wl,wr);
         } else {
-          pmb->precon->PiecewiseLinearX2(k,j,il,iu,w,bcc,wl,wr);
+          pmb->precon->HighResFuncX2(k,j,il,iu,w,bcc,wl,wr);
         }
 
         // compute fluxes at j
@@ -187,7 +199,7 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
         if (reconstruct_order == 1) {
           pmb->precon->DonorCellX3(k,j,il,iu,w,bcc,wl,wr);
         } else {
-          pmb->precon->PiecewiseLinearX3(k,j,il,iu,w,bcc,wl,wr);
+          pmb->precon->HighResFuncX3(k,j,il,iu,w,bcc,wl,wr);
         }
 
         // compute fluxes at k
