@@ -31,6 +31,13 @@ public:
   Real GetG2() const {return g2_;}
   Real GetG3() const {return g3_;}
 
+  Real GetOmega1() const {return omega1_;}
+  Real GetOmega2() const {return omega2_;}
+  Real GetOmega3() const {return omega3_;}
+  Real GetOmegaX() const {return omegax_;}
+  Real GetOmegaY() const {return omegay_;}
+  Real GetOmegaZ() const {return omegaz_;}
+
   // data
   bool hydro_sourceterms_defined;
 
@@ -41,6 +48,10 @@ public:
     AthenaArray<Real> &c);
   void ConstantAcceleration(const Real dt, const AthenaArray<Real> *flx,
     const AthenaArray<Real> &p, AthenaArray<Real> &c);
+  void Coriolis123(const Real dt, const AthenaArray<Real> *flx,
+    const AthenaArray<Real> &p, AthenaArray<Real> &c);
+  void CoriolisXYZ(const Real dt, const AthenaArray<Real> *flx,
+    const AthenaArray<Real> &p, AthenaArray<Real> &c);
   void EnrollSrcTermFunction(SrcTermFunc_t my_func);
   SrcTermFunc_t UserSourceTerm;
 
@@ -48,5 +59,8 @@ private:
   Hydro *pmy_hydro_;  // ptr to Hydro containing this HydroSourceTerms
   Real gm_;           // GM for point mass MUST BE LOCATED AT ORIGIN
   Real g1_, g2_, g3_; // constant acc'n in each direction
+
+  Real omega1_, omega2_, omega3_; // constant coriolis acc'n in each direction
+  Real omegax_, omegay_, omegaz_; // coriolis acc'n in cartesian direction
 };
 #endif
