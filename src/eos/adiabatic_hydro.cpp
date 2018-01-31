@@ -83,6 +83,10 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
       // apply pressure floor, correct total energy
       u_e = (w_p > pressure_floor_) ?  u_e : ((pressure_floor_/gm1) + ke);
       w_p = (w_p > pressure_floor_) ?  w_p : pressure_floor_;
+
+      // set tracer mass mixing ratio
+      for (int n = ITR; n < ITR + NTRACER; ++n)
+        prim(n,k,j,i) = cons(n,k,j,i)*di;
     }
   }}
 }
@@ -128,6 +132,10 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
       u_m2 = w_vy*w_d;
       u_m3 = w_vz*w_d;
       u_e = w_p*igm1 + 0.5*w_d*(SQR(w_vx) + SQR(w_vy) + SQR(w_vz));
+
+      // set tracer density
+      for (int n = ITR; n < ITR + NTRACER; ++n)
+        cons(n,k,j,i) = w_d*prim(n,k,j,i);
     }
   }}
 }

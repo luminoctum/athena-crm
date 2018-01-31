@@ -135,3 +135,14 @@ Hydro::~Hydro()
   psi_.DeleteAthenaArray();
   ps_.DeleteAthenaArray();
 }
+
+void __attribute__((weak)) Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
+  AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
+{
+  for (int i = il; i <= iu; ++i) {
+    for (int n = ITR; n < ITR + NTRACER; ++n) {
+      flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
+               + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
+    }
+  }
+}

@@ -362,6 +362,19 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
     }
   }
 
+  // tracer
+  if (NTRACER > 0) {
+    if (output_params.variable.compare("prim") == 0 ||
+        output_params.variable.compare("tracer") == 0) {
+      pod = new OutputData;
+      pod->type = "VECTORS";
+      pod->name = "tracer";
+      pod->data.InitWithShallowSlice(phyd->w,4,ITR,NTRACER);
+      AppendOutputDataNode(pod);
+      num_vars_+=NTRACER;
+    }
+  }
+
   // momentum vector
   if (output_params.variable.compare("m") == 0 || 
       output_params.variable.compare("cons") == 0) {

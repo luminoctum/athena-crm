@@ -44,6 +44,8 @@ public:
   void RiemannSolver(const int k, const int j, const int il, const int iu,
     const int ivx, const AthenaArray<Real> &bx, AthenaArray<Real> &wl,
     AthenaArray<Real> &wr, AthenaArray<Real> &flx);
+  void TracerAdvection(int k, int j, int il, int iu, int ivx,
+    AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx);
   void DecomposePressure(AthenaArray<Real> &w);
   void AssemblePressure(AthenaArray<Real> &w);
 

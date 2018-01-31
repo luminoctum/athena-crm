@@ -58,3 +58,21 @@ File changed:
 File added:
 * src/pgen/straka.cpp
 * src/pgen/robert.cpp
+
+11. add Coriolis acceleration: 681ef4d
+File changed:
+* src/hydro/srcterms/hydro_srcterms.hpp
+* src/hydro/srcterms/hydro_srcterms.cpp
+File added:
+* src/hydro/srcterms/coriolis_acc.cpp
+
+12. add tracer advection (only works for adiabatic_hydro now)
+File changed:
+* src/defs.hpp.in
+* src/configure.py
+* src/athena.hpp
+* src/eos/adiabatic_hydro.cpp
+* src/hydro/hydro.hpp
+* src/hydro/hydro.cpp
+* src/hydro/calculate_fluxes.cpp
+* src/outputs/outputs.cpp

@@ -101,6 +101,10 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
       // compute fluxes
       RiemannSolver(k,j,is,ie+1,IVX,b1,wl,wr,flx);
 
+      // tracer advection
+      if (NTRACER > 0)
+        TracerAdvection(k,j,is,ie+1,IVX,wl,wr,flx);
+
       // store fluxes
       if(k>=ks && k<=ke && j>=js && j<=je) {
         for(int n=0; n<NHYDRO; n++) {
@@ -156,6 +160,10 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
         // compute fluxes at j
         RiemannSolver(k,j,il,iu,IVY,b2,wl,wr,flx); 
 
+        // tracer advection
+        if (NTRACER > 0)
+          TracerAdvection(k,j,il,iu,IVY,wl,wr,flx);
+
         // store fluxes
         if(k>=ks && k<=ke) {
           for(int n=0; n<NHYDRO; n++) {
@@ -204,6 +212,10 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
 
         // compute fluxes at k
         RiemannSolver(k,j,il,iu,IVZ,b3,wl,wr,flx);
+
+        // tracer advection
+        if (NTRACER > 0)
+          TracerAdvection(k,j,il,iu,IVZ,wl,wr,flx);
 
         if(j>=js && j<=je) {
           for(int n=0; n<NHYDRO; n++) {

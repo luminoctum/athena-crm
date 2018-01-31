@@ -75,5 +75,22 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       phydro->w(IVY,j,i) = 0.;
     }
 
+  // add tracers if defined
+  #ifdef NTRACER
+  for (int j = js; j <= je; ++j)
+    for (int i = is; i <= ie; ++i) {
+      if (NTRACER > 0) {
+        phydro->w(ITR,j,i) = pcoord->x1v(i);
+        if (j > 7./8.*js + 1./8.*je)
+          phydro->w(ITR,j,i) += 1000.;
+      }
+      if (NTRACER > 1) {
+        phydro->w(ITR+1,j,i) = pcoord->x2v(j);
+        if (i > 7./8.*is + 1./8.*ie)
+          phydro->w(ITR+1,j,i) += 1000.;
+      }
+    }
+  #endif
+
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 }

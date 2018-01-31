@@ -78,6 +78,11 @@ parser.add_argument('--order',
     choices=['plm','weno3','weno5','cp3','cp5'],
     help='select spatial reconstruction algorithm')
 
+# --ntracer=[num] argument
+parser.add_argument('--ntracer',
+    default='0',
+    help='request the number of tracer components in hydro eos')
+
 # -b argument
 parser.add_argument('-b',
     action='store_true',
@@ -234,6 +239,14 @@ if args['order'] in ['weno5','cp5']:
 else:
   definitions['NGHOST_VALUE'] = '2'
 
+# set number of tracers
+ntracer = int(args['ntracer'])
+definitions['NTRACER_VARIABLES'] = str(ntracer)
+
+# set total number of hydro variables
+definitions['NMASS_VARIABLES'] = str(1 + ntracer)
+definitions['NHYDRO_VARIABLES'] = str(int(definitions['NHYDRO_VARIABLES']) + ntracer)
+
 # -b argument
 # set variety of macros based on whether MHD/hydro or adi/iso are defined
 if args['b']:
@@ -254,10 +267,7 @@ else:
   makefile_options['EOS_FILE'] += '_hydro'
   definitions['NFIELD_VARIABLES'] = '0'
   makefile_options['RSOLVER_DIR'] = 'hydro/'
-  if args['eos'] == 'adiabatic':
-    definitions['NWAVE_VALUE'] = '5'
-  else:
-    definitions['NWAVE_VALUE'] = '4'
+  definitions['NWAVE_VALUE'] = definitions['NHYDRO_VARIABLES']
 
 # -s, -g, and -t arguments
 definitions['RELATIVISTIC_DYNAMICS'] = '1' if args['s'] or args['g'] else '0'
@@ -424,6 +434,7 @@ print('Your Athena++ distribution has now been configured with the following opt
 print('  Problem generator:       ' + args['prob'])
 print('  Coordinate system:       ' + args['coord'])
 print('  Equation of state:       ' + args['eos'])
+print('  Number of tracers:       ' + args['ntracer'])
 print('  Riemann solver:          ' + args['flux'])
 print('  Reconstruction method:   ' + args['order'])
 print('  Magnetic fields:         ' + ('ON' if args['b'] else 'OFF'))
