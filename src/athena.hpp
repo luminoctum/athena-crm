@@ -42,7 +42,7 @@ typedef struct EdgeField {
 // enums used everywhere
 
 // array indices for conserved: density, momemtum, total energy, face-centered field 
-enum {IDN=0, ITR=1, IM1=NMASS, IM2=NMASS+1, IM3=NMASS+2, IEN=NMASS+3};
+enum {IDN=0, IVP=1, ICD=1+NVAPOR, ITR=1+2*NVAPOR, IM1=NMASS, IM2=NMASS+1, IM3=NMASS+2, IEN=NMASS+3};
 enum {IB1=0, IB2=1, IB3=2};
 
 // array indices for 1D primitives: velocity, transverse components of field

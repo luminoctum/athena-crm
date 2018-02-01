@@ -97,6 +97,8 @@ public:
   #endif  // !RELATIVISTIC_DYNAMICS
 
   Real GetGamma() const {return gamma_;}
+  Real GetCvRatio(int n) const {return rcv_[n];}
+  Real GetMassRatio(int n) const {return eps_[n];}
   Real GetIsoSoundSpeed() const {return iso_sound_speed_;}
   Real GetDensityFloor() const {return density_floor_;}
   Real GetPressureFloor() const {return pressure_floor_;}
@@ -116,6 +118,10 @@ private:
   AthenaArray<Real> normal_mm_;          // normal-frame momenta, used in GR MHD
   AthenaArray<Real> normal_bb_;          // normal-frame fields, used in GR MHD
   AthenaArray<Real> normal_tt_;          // normal-frame M.B, used in GR MHD
+
+  Real eps_[1+2*NVAPOR];
+  Real rcv_[1+2*NVAPOR];
+  Real latent_[1+2*NVAPOR];
 };
 
 #endif

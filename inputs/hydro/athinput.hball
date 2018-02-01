@@ -1,0 +1,66 @@
+<comment>
+problem   = Dense sinking bubble test
+reference = Straka et al., 1993
+configure = --prob=hball --flux=lmars --order=weno5 --nvapor=1 -netcdf -mpi
+
+<job>
+problem_id = hball # problem ID: basename of output filenames
+
+<output1>
+file_type  = hst         # History data dump
+dt         = 10        # time increment between outputs
+
+<output2>
+file_type  = netcdf   # Binary data dump
+variable   = prim        # variables to be output
+dt         = 1         # time increment between outputs
+
+<output3>
+file_type  = rst      # restart dump
+dt         = 2
+
+<time>
+cfl_number = 0.4         # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim       = -1          # cycle limit
+tlim       = 40         # time limit
+
+<mesh>
+nx1        = 300    # Number of zones in X1-direction
+x1min      = 0.         # minimum value of X1
+x1max      = 1.5E3         # maximum value of X1
+ix1_bc     = reflecting # inner-X1 boundary flag
+ox1_bc     = reflecting # outer-X1 boundary flag
+
+nx2        = 200  # Number of zones in X2-direction
+x2min      = 0.           # minimum value of X2
+x2max      = 1.E3        # maximum value of X2
+ix2_bc     = reflecting   # inner-X2 boundary flag
+ox2_bc     = reflecting   # outer-X2 boundary flag
+
+nx3        = 1           # Number of zones in X3-direction
+x3min      = -0.5        # minimum value of X3
+x3max      = 0.5         # maximum value of X3
+ix3_bc     = periodic    # inner-X3 boundary flag
+ox3_bc     = periodic    # outer-X3 boundary flag
+
+<meshblock>
+nx1        = 300
+nx2        = 25
+nx3        = 1
+
+<hydro>
+grav_acc1   = -9.8
+gamma       = 1.4         # gamma = C_p/C_v
+eps         = 0.069
+
+<problem>
+dT    = 0.5
+xc    = 500.
+zc    = 260.
+s     = 100.
+a     = 50.
+p0    = 1.E5
+Ts    = 303.15
+Rd    = 287.
+cp    = 1004.5
+qball = 0.5

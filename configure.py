@@ -78,6 +78,11 @@ parser.add_argument('--order',
     choices=['plm','weno3','weno5','cp3','cp5'],
     help='select spatial reconstruction algorithm')
 
+# --nvapor=[num] argument
+parser.add_argument('--nvapor',
+    default='0',
+    help='request the number of vapor components in hydro eos')
+
 # --ntracer=[num] argument
 parser.add_argument('--ntracer',
     default='0',
@@ -239,13 +244,17 @@ if args['order'] in ['weno5','cp5']:
 else:
   definitions['NGHOST_VALUE'] = '2'
 
+# set number of vapors
+nvapor = int(args['nvapor'])
+definitions['NVAPOR_VARIABLES'] = str(nvapor)
+
 # set number of tracers
 ntracer = int(args['ntracer'])
 definitions['NTRACER_VARIABLES'] = str(ntracer)
 
 # set total number of hydro variables
-definitions['NMASS_VARIABLES'] = str(1 + ntracer)
-definitions['NHYDRO_VARIABLES'] = str(int(definitions['NHYDRO_VARIABLES']) + ntracer)
+definitions['NMASS_VARIABLES'] = str(1 + 2*nvapor + ntracer)
+definitions['NHYDRO_VARIABLES'] = str(int(definitions['NHYDRO_VARIABLES']) + 2*nvapor + ntracer)
 
 # -b argument
 # set variety of macros based on whether MHD/hydro or adi/iso are defined
@@ -435,6 +444,7 @@ print('  Problem generator:       ' + args['prob'])
 print('  Coordinate system:       ' + args['coord'])
 print('  Equation of state:       ' + args['eos'])
 print('  Number of tracers:       ' + args['ntracer'])
+print('  Number of vapors:        ' + args['nvapor'])
 print('  Riemann solver:          ' + args['flux'])
 print('  Reconstruction method:   ' + args['order'])
 print('  Magnetic fields:         ' + ('ON' if args['b'] else 'OFF'))
