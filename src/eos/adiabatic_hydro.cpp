@@ -18,8 +18,8 @@
 #include "../mesh/mesh.hpp"
 #include "../parameter_input.hpp"
 #include "../field/field.hpp"
-#include "../utils/utils.hpp"
 #include "../math_funcs.hpp"
+#include "../microphysics/microphysics.hpp"
 
 // EquationOfState constructor
 
@@ -29,33 +29,6 @@ EquationOfState::EquationOfState(MeshBlock *pmb, ParameterInput *pin)
   gamma_ = pin->GetReal("hydro","gamma");
   density_floor_  = pin->GetOrAddReal("hydro","dfloor",(1024*(FLT_MIN)));
   pressure_floor_ = pin->GetOrAddReal("hydro","pfloor",(1024*(FLT_MIN)));
-
-  std::vector<std::string> str;
-
-  // read eps, size should be NVAPOR
-  if (NVAPOR > 0)
-    SplitString(pin->GetOrAddString("hydro", "eps", ""), str);
-  for (int n = 0; n < 1+2*NVAPOR; ++n) eps_[n] = 1.;
-  for (int n = 0; n < std::min(NVAPOR, (int)str.size()); ++n) {
-    eps_[1+n] = atof(str[n].c_str());     // gas
-    eps_[1+2*n] = atof(str[n].c_str());   // condensate
-  }
-
-  // read rcv, size should be NVAPOR
-  if (NVAPOR > 0)
-    SplitString(pin->GetOrAddString("hydro", "rcv", ""), str);
-  for (int n = 0; n < 1+2*NVAPOR; ++n) rcv_[n] = 1.;
-  for (int n = 0; n < std::min(NVAPOR, (int)str.size()); ++n) {
-    rcv_[1+n] = atof(str[n].c_str());     // gas
-    rcv_[1+2*n] = atof(str[n].c_str());   // condensate
-  }
-
-  // read latent, size should be NVAPOR, unit is [J/kg]
-  if (NVAPOR > 0)
-    SplitString(pin->GetOrAddString("hydro", "latent", ""), str);
-  for (int n = 0; n < 1+2*NVAPOR; ++n) latent_[n] = 0.;
-  for (int n = 0; n < std::min(NVAPOR, (int)str.size()); ++n)
-    latent_[1+2*n] = atof(str[n].c_str());
 }
 
 // destructor
@@ -76,6 +49,7 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
   AthenaArray<Real> &bcc, Coordinates *pco, int is, int ie, int js, int je, int ks, int ke)
 {
   Real gm1 = GetGamma() - 1.0;
+  Microphysics *pmicro = pmy_block_->pmicro;
 
   int nthreads = pmy_block_->pmy_mesh->GetNumMeshThreads();
 #pragma omp parallel default(shared) num_threads(nthreads)
@@ -102,7 +76,7 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
         cons(n,k,j,i) = (cons(n,k,j,i) > density_floor_) ?  cons(n,k,j,i) : density_floor_;
         // record total density
         density += cons(n,k,j,i);
-        prim(n,k,j,i) = cons(n,k,j,i)/eps_[n];
+        prim(n,k,j,i) = cons(n,k,j,i)/pmicro->GetMassRatio(n);
         sum += prim(n,k,j,i);
       }
 
@@ -121,16 +95,19 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
 
       // internal energy
       Real KE = 0.5*di*(_sqr(u_m1) + _sqr(u_m2) + _sqr(u_m3));
-      Real LE = 0.;
-      for (int n = ICD; n < ICD + NVAPOR; ++n)
-        LE += latent_[n]*cons(n,k,j,i);
+      Real LE = 0., gtol = 1.;
+      for (int n = ICD; n < ICD + NVAPOR; ++n) {
+        LE += pmicro->GetLatent(1+n-ICD)*cons(n,k,j,i);
+        gtol -= prim(n,k,j,i);
+      }
       Real gmix = 1.;
-      for (int n = 1; n < ITR; ++n)
-        gmix += prim(n,k,j,i)*(rcv_[n] - 1.);
-      w_p = gm1*(u_e - KE - LE)/gmix;
+      for (int n = 1; n <= NVAPOR; ++n)
+        gmix += (prim(n,k,j,i) + prim(n+NVAPOR,k,j,i))
+          *(pmicro->GetCvRatio(n) - 1.);
+      w_p = gm1*(u_e - KE - LE)*gtol/gmix;
 
       // apply pressure floor, correct total energy
-      u_e = (w_p > pressure_floor_) ?  u_e : ((pressure_floor_/gm1*gmix) + KE + LE);
+      u_e = (w_p > pressure_floor_) ?  u_e : ((pressure_floor_/gm1*gmix/gtol) + KE + LE);
       w_p = (w_p > pressure_floor_) ?  w_p : pressure_floor_;
 
       // set tracer mass mixing ratio
@@ -155,6 +132,7 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
      int is, int ie, int js, int je, int ks, int ke)
 {
   Real gm1 = GetGamma() - 1.0;
+  Microphysics *pmicro = pmy_block_->pmicro;
 
   int nthreads = pmy_block_->pmy_mesh->GetNumMeshThreads();
 #pragma omp parallel default(shared) num_threads(nthreads)
@@ -178,7 +156,7 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
       // density
       Real qd = 1., sum = 0.;
       for (int n = 1; n < ITR; ++n) {
-        cons(n,k,j,i) = prim(n,k,j,i)*eps_[n];
+        cons(n,k,j,i) = prim(n,k,j,i)*pmicro->GetMassRatio(n);
         qd -= prim(n,k,j,i);
         sum += cons(n,k,j,i);
       }
@@ -194,13 +172,16 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
 
       // total energy
       Real KE = 0.5*w_d*(_sqr(w_vx) + _sqr(w_vy) + _sqr(w_vz));
-      Real LE = 0.;
-      for (int n = ICD; n < ICD + NVAPOR; ++n)
-        LE += latent_[n]*cons(n,k,j,i);
+      Real LE = 0., gtol = 1.;
+      for (int n = ICD; n < ICD + NVAPOR; ++n) {
+        LE += pmicro->GetLatent(1+n-ICD)*cons(n,k,j,i);
+        gtol -= prim(n,k,j,i);
+      }
       Real gmix = 1.;
-      for (int n = 1; n < ITR; ++n)
-        gmix += prim(n,k,j,i)*(rcv_[n] - 1.);
-      u_e = w_p/gm1*gmix + KE + LE;
+      for (int n = 1; n <= NVAPOR; ++n)
+        gmix += (prim(n,k,j,i) + prim(n+NVAPOR,k,j,i))
+          *(pmicro->GetCvRatio(n) - 1.);
+      u_e = w_p/gm1*gmix/gtol + KE + LE;
 
       // set tracer density
       for (int n = ITR; n < ITR + NTRACER; ++n)
@@ -217,8 +198,12 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
 
 Real EquationOfState::SoundSpeed(const Real prim[NHYDRO])
 {
-  Real gmix = 1.;
+  Microphysics *pmicro = pmy_block_->pmicro;
+  Real gmix = 1., gtol = 1.;
   for (int n = 1; n < ITR; ++n)
-    gmix += prim[n]*(rcv_[n] - 1.);
+    gmix += prim[n]*(pmicro->GetCvRatio(n) - 1.);
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    gtol -= prim[n];
+  gmix /= gtol;
   return sqrt((gamma_ - 1. + gmix)/gmix*prim[IEN]/prim[IDN]);
 }

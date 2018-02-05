@@ -25,6 +25,7 @@
 #include "../field/field.hpp"
 #include "../bvals/bvals.hpp"
 #include "../eos/eos.hpp"
+#include "../microphysics/microphysics.hpp"
 #include "../parameter_input.hpp"
 #include "../utils/buffer_utils.hpp"
 #include "../reconstruct/reconstruction.hpp"
@@ -123,6 +124,9 @@ MeshBlock::MeshBlock(int igid, int ilid, LogicalLocation iloc, RegionSize input_
   if (MAGNETIC_FIELDS_ENABLED) pfield = new Field(this, pin);
   peos = new EquationOfState(this, pin);
 
+  // microphysics
+  pmicro = new Microphysics(this, pin);
+
   // Create user mesh data
   InitUserMeshBlockData(pin);
 
@@ -213,6 +217,9 @@ MeshBlock::MeshBlock(int igid, int ilid, Mesh *pm, ParameterInput *pin,
   if (MAGNETIC_FIELDS_ENABLED) pfield = new Field(this, pin);
   peos = new EquationOfState(this, pin);
 
+  // microphysics
+  pmicro = new Microphysics(this, pin);
+
   InitUserMeshBlockData(pin);
 
   // load hydro and field data
@@ -274,6 +281,7 @@ MeshBlock::~MeshBlock()
   delete phydro;
   if (MAGNETIC_FIELDS_ENABLED) delete pfield;
   delete peos;
+  delete pmicro;
 
   // delete user output variables array
   user_out_var.DeleteAthenaArray();
