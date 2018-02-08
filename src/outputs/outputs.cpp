@@ -578,7 +578,7 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
 
   } // endif (MAGNETIC_FIELDS_ENABLED)
 
-  if (output_params.variable.compare("uov") == 0
+  /*if (output_params.variable.compare("uov") == 0
   || output_params.variable.compare("user_out_var") == 0) {
     for (int n = 0; n < pmb->nuser_out_var; ++n) {
       char vn[16];
@@ -589,6 +589,47 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
       pod->data.InitWithShallowSlice(pmb->user_out_var,4,n,1);
       AppendOutputDataNode(pod);
       num_vars_++;
+    }
+  }*/
+
+  // user defined output variables
+  if (output_params.variable.compare(0, 3, "uov") == 0
+   || output_params.variable.compare(0, 12, "user_out_var") == 0) {
+    int iv, ns=0, ne=pmb->nuser_out_var-1;
+    if(sscanf(output_params.variable.c_str(), "uov%d", &iv)>0) {
+      if(iv>=0 && iv<pmb->nuser_out_var)
+        ns=iv, ne=iv;
+    }
+    else if(sscanf(output_params.variable.c_str(), "user_out_var%d", &iv)>0) {
+      if(iv>=0 && iv<pmb->nuser_out_var)
+        ns=iv, ne=iv;
+    }
+    for (int n = ns; n <= ne; ++n) {
+      pod = new OutputData;
+      pod->type = "SCALARS";
+      if(pmb->user_out_var_names_[n].length()!=0)
+        pod->name=pmb->user_out_var_names_[n];
+      else {
+        char vn[16];
+        sprintf(vn, "user_out_var%d", n);
+        pod->name = vn;
+      }
+      pod->data.InitWithShallowSlice(pmb->user_out_var,4,n,1);
+      AppendOutputDataNode(pod);
+      num_vars_++;
+    }
+  }
+
+  for (int n = 0; n < pmb->nuser_out_var; ++n) {
+    if(pmb->user_out_var_names_[n].length()!=0) {
+      if(output_params.variable.compare(pmb->user_out_var_names_[n]) == 0) {
+        pod = new OutputData;
+        pod->type = "SCALARS";
+        pod->name=pmb->user_out_var_names_[n];
+        pod->data.InitWithShallowSlice(pmb->user_out_var,4,n,1);
+        AppendOutputDataNode(pod);
+        num_vars_++;
+      }
     }
   }
 
@@ -808,6 +849,7 @@ bool OutputType::SliceOutputData(MeshBlock *pmb, int dim)
 
     ReplaceOutputDataNode(pdata,pnew);
     pdata = pdata->pnext;
+    //pdata = pnew->pnext;
   }
  
   // modify array indices

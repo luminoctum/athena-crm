@@ -36,6 +36,7 @@ class Reconstruction;
 class Hydro;
 class Field;
 class EquationOfState;
+class Microphysics;
 
 //----------------------------------------------------------------------------------------
 //! \struct NeighborBlock
@@ -112,6 +113,7 @@ public:
   // user output variables for analysis
   int nuser_out_var;
   AthenaArray<Real> user_out_var;
+  std::string *user_out_var_names_;
 
   // user MeshBlock data that can be stored in restart files
   AthenaArray<Real> *ruser_meshblock_data;
@@ -127,6 +129,9 @@ public:
   Hydro *phydro;
   Field *pfield;
   EquationOfState *peos;
+
+  // microphysics
+  Microphysics *pmicro;
 
   MeshBlock *prev, *next;
 
@@ -151,6 +156,8 @@ private:
   void AllocateRealUserMeshBlockDataField(int n);
   void AllocateIntUserMeshBlockDataField(int n);
   void AllocateUserOutputVariables(int n);
+  void SetUserOutputVariableName(int n, const char *name);
+
   void ProblemGenerator(ParameterInput *pin); // in ../pgen
 };
 

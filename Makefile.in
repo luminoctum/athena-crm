@@ -37,6 +37,7 @@ SRC_FILES := $(wildcard src/*.cpp) \
 			 src/reconstruct/$(RECONSTRUCT_FILE) \
 	     $(wildcard src/task_list/*.cpp) \
 	     $(wildcard src/utils/*.cpp) \
+       $(wildcard src/microphysics/*.cpp) \
 	     src/pgen/$(PROBLEM_FILE) \
 	     src/pgen/default_pgen.cpp
 OBJ_DIR := obj/

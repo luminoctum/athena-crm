@@ -107,6 +107,8 @@ public:
   enum TaskStatus UserWork(MeshBlock *pmb, int step);
   enum TaskStatus NewBlockTimeStep(MeshBlock *pmb, int step);
   enum TaskStatus CheckRefinement(MeshBlock *pmb, int step);
+
+  enum TaskStatus ApplyMicrophysics(MeshBlock *pmb, int step);
 };
 
 //----------------------------------------------------------------------------------------
@@ -164,6 +166,8 @@ namespace HydroIntegratorTaskNames {
   const uint64_t USERWORK=1LL<<38;
   const uint64_t NEW_DT  =1LL<<39;
   const uint64_t AMR_FLAG=1LL<<40;
+
+  const uint64_t MICROPHY=1LL<<41;
 };
 
 #endif // TASK_LIST_HPP

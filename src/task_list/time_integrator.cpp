@@ -23,6 +23,7 @@
 #include "../bvals/bvals.hpp"
 #include "../eos/eos.hpp"
 #include "../hydro/srcterms/hydro_srcterms.hpp"
+#include "../microphysics/microphysics.hpp"
 
 //----------------------------------------------------------------------------------------
 //  TimeIntegratorTaskList constructor
@@ -120,8 +121,11 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm)
       }
     }
 
+    // microphysics
+    AddTimeIntegratorTask(MICROPHY,CON2PRIM);
+
     // everything else
-    AddTimeIntegratorTask(PHY_BVAL,CON2PRIM);
+    AddTimeIntegratorTask(PHY_BVAL,MICROPHY);
     AddTimeIntegratorTask(USERWORK,PHY_BVAL);
     AddTimeIntegratorTask(NEW_DT,USERWORK);
     if(pm->adaptive==true) {
@@ -237,6 +241,11 @@ void TimeIntegratorTaskList::AddTimeIntegratorTask(uint64_t id, uint64_t dep)
       task_list_[ntasks].TaskFunc=
         static_cast<enum TaskStatus (TaskList::*)(MeshBlock*,int)>
         (&TimeIntegratorTaskList::Primitives);
+      break;
+    case (MICROPHY):
+      task_list_[ntasks].TaskFunc=
+        static_cast<enum TaskStatus (TaskList::*)(MeshBlock*,int)>
+        (&TimeIntegratorTaskList::ApplyMicrophysics);
       break;
     case (PHY_BVAL):
       task_list_[ntasks].TaskFunc=
@@ -537,6 +546,24 @@ enum TaskStatus TimeIntegratorTaskList::Primitives(MeshBlock *pmb, int step)
     pmb->peos->ConservedToPrimitive(phydro->u, phydro->w1, pfield->b,
                                     phydro->w, pfield->bcc, pmb->pcoord,
                                     is, ie, js, je, ks, ke);
+  }
+
+  return TASK_SUCCESS;
+}
+
+enum TaskStatus TimeIntegratorTaskList::ApplyMicrophysics(MeshBlock *pmb, int step)
+{
+  Microphysics *pmicro = pmb->pmicro;
+  Hydro *ph = pmb->phydro;
+  // return if there are no source terms to be added
+  if (pmicro->ncycle == 0) return TASK_NEXT;
+
+  // only do microphysics at last rk step
+  if (step < nsub_steps) return TASK_NEXT;
+
+  // do microphysics every xx step
+  if (pmb->pmy_mesh->ncycle % pmicro->ncycle == 0) {
+    pmicro->SaturationAdjust(ph->w,ph->u);
   }
 
   return TASK_SUCCESS;
