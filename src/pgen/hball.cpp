@@ -16,6 +16,7 @@
 #include "../bvals/bvals.hpp"
 #include "../coordinates/coordinates.hpp"
 #include "../eos/eos.hpp"
+#include "../microphysics/microphysics.hpp"
 #include "../field/field.hpp"
 #include "../hydro/hydro.hpp"
 #include "../mesh/mesh.hpp"
@@ -27,9 +28,9 @@ Real grav, p0, Ts, Rd, cp, K;
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
   grav = - phydro->psrc->GetG1();
+  Rd = pmicro->GetRd();
   p0 = pin->GetReal("problem", "p0");
   Ts = pin->GetReal("problem", "Ts");
-  Rd = pin->GetReal("problem", "Rd");
   cp = pin->GetReal("problem", "cp");
 
   Real xc = pin->GetReal("problem", "xc");
@@ -48,7 +49,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       Real temp = Ts - grav*x1/cp;
       phydro->w(IPR,j,i) = p0*pow(temp/Ts, cp/Rd);
       if (r <= 2.*a) {
-        temp *= 1./(1. - qball + qball*peos->GetMassRatio(1));
+        temp *= 1./(1. - qball + qball*pmicro->GetMassRatio(1));
         phydro->w(1,j,i) = qball;
       } else
         phydro->w(1,j,i) = 0.;

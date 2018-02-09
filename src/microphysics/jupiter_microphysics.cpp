@@ -101,10 +101,10 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
         for (int n = ICD; n < ICD + NVAPOR; ++n)
           qtol -= prim[n];
 
-        int iter = 0, max_iter = 10;
+        int iter = 0, max_iter = 6;
         Real temp;
         //LoggingInfo<double> log1("dT");
-        while (fabs(dT) > 1.E-4) {
+        while (fabs(dT) > 1.E-4 && iter < max_iter) {
           temp = Temperature(prim);
           // H2O - H2O(s)
           rate = GasCloudIdeal(prim, iH2O, iH2Oc, temp,
@@ -125,9 +125,9 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
           // adjust pressure
           prim[IPR] = prim[IDN]*Rd_*(temp + dT)*qtol/qmass;
           iter++;
-          if (iter > max_iter) {
-            msg << "Saturation Adjustment Iteration reaches maximum." << std::endl;
-            throw std::runtime_error(msg.str().c_str());
+          if (iter >= max_iter) {
+            std::cerr << "Saturation Adjustment Iteration reaches maximum." << std::endl;
+            //throw std::runtime_error(msg.str().c_str());
           }
           //log1 << temp << dT << SatVaporPresH2OIdeal(temp+dT);
         }
@@ -140,9 +140,9 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
 void Microphysics::Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const& u, Real dt,
   int is, int ie, int js, int je, int ks, int ke)
 {
-  std::cout << "precipitationo" << std::endl;
   std::stringstream msg;
   if (dt > autoc_) {
+    msg << dt << " " << autoc_ << " ";
     msg << "Microphysics time step smaller than autoconversion time" << std::endl;
     throw std::runtime_error(msg.str().c_str());
   }
@@ -191,7 +191,6 @@ void Microphysics::Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const& 
 
 void Microphysics::Evaporation(AthenaArray<Real> &w, AthenaArray<Real> const& u, Real dt)
 {
-  std::cout << "evaporation" << std::endl;
   MeshBlock *pmb = pmy_block_;
 
   for (int k = pmb->ks; k <= pmb->ke; ++k)
@@ -232,29 +231,3 @@ void Microphysics::Evaporation(AthenaArray<Real> &w, AthenaArray<Real> const& u,
         }
       }
 }
-
-// Dropping Precipitation
-#if PRECIPITATION_ENABLED
-  void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
-    AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
-  {
-    Real tv = pmy_block->pmicro->GetTerminalVelocity();
-    for (int i = il; i <= iu; ++i) {
-      if (ivx == IVX) {
-        for (int n = ITR; n < ITR + NVAPOR; ++n) {
-          flx(n,i) = 0.5*((wl(ivx,i) + tv) + fabs(wl(ivx,i) + tv))*wl(n,i)*wl(IDN,i)
-                   + 0.5*((wr(ivx,i) + tv) - fabs(wr(ivx,i) + tv))*wr(n,i)*wr(IDN,i);
-        }
-        for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n) {
-          flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                   + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-        }
-      } else {
-        for (int n = ITR; n < ITR + NTRACER; ++n) {
-          flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                   + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-        }
-      }
-    }
-  }
-#endif

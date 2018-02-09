@@ -6,8 +6,13 @@
 Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
 {
   pmy_block_ = pmb;
-  Rd_ = pin->GetReal("microphysics", "Rd");
-  ncycle = pin->GetOrAddInteger("microphysics", "ncycle", 1);
+  if (NVAPOR > 0) {
+    Rd_ = pin->GetReal("microphysics", "Rd");
+    ncycle = pin->GetOrAddInteger("microphysics", "ncycle", 1);
+  } else {
+    Rd_ = 0.;
+    ncycle = 0.;
+  }
 
   std::vector<std::string> str;
 
@@ -50,3 +55,29 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
 
 Microphysics::~Microphysics()
 {}
+
+// Dropping Precipitation
+#if PRECIPITATION_ENABLED
+void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
+  AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
+{
+  Real tv = pmy_block->pmicro->GetTerminalVelocity();
+  for (int i = il; i <= iu; ++i) {
+    if (ivx == IVX) {
+      for (int n = ITR; n < ITR + NVAPOR; ++n) {
+        flx(n,i) = 0.5*((wl(ivx,i) + tv) + fabs(wl(ivx,i) + tv))*wl(n,i)*wl(IDN,i)
+                 + 0.5*((wr(ivx,i) + tv) - fabs(wr(ivx,i) + tv))*wr(n,i)*wr(IDN,i);
+      }
+      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n) {
+        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
+                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
+      }
+    } else {
+      for (int n = ITR; n < ITR + NTRACER; ++n) {
+        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
+                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
+      }
+    }
+  }
+}
+#endif

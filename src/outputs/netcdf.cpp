@@ -120,7 +120,7 @@ void NetcdfOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
 
     // 3. define variables
     int ivt, ivx1, ivx2, ivx3, ivx1b, ivx2b, ivx3b;
-    int loc[4] = {pmb->loc.lx1, pmb->loc.lx2, pmb->loc.lx3, pmb->loc.level};
+    int loc[4] = {(int)pmb->loc.lx1, (int)pmb->loc.lx2, (int)pmb->loc.lx3, pmb->loc.level};
     int pos[4];
 
     nc_def_var(ifile, "time", NC_FLOAT, 1, &idt, &ivt);
@@ -192,7 +192,7 @@ void NetcdfOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
     // 4. write variables
     float *data = new float[ncells1 * ncells2 * ncells3];
     size_t start[4] = {0, 0, 0, 0};
-    size_t count[4] = {1, ncells3, ncells2, ncells1};
+    size_t count[4] = {1, (size_t)ncells3, (size_t)ncells2, (size_t)ncells1};
 
     float time = (float)pm->time;
     nc_put_vara_float(ifile, ivt, start, count, &time);
