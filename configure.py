@@ -13,6 +13,7 @@
 #   --eos=choice      use choice as the equation of state
 #   --flux=choice     use choice as the Riemann solver
 #   --order=choice    use choice as the spatial reconstruction algorithm
+#   -precip           enable precipitation
 #   -b                enable magnetic fields
 #   -s                enable special relativity
 #   -g                enable general relativity
@@ -87,6 +88,12 @@ parser.add_argument('--nvapor',
 parser.add_argument('--ntracer',
     default='0',
     help='request the number of tracer components in hydro eos')
+
+# -precip argument
+parser.add_argument('-precip',
+    action='store_true',
+    default=False,
+    help='enable precipitation')
 
 # -b argument
 parser.add_argument('-b',
@@ -250,11 +257,20 @@ definitions['NVAPOR_VARIABLES'] = str(nvapor)
 
 # set number of tracers
 ntracer = int(args['ntracer'])
+if args['precip']:
+  ntracer += nvapor
+  args['ntracer'] = str(ntracer)
 definitions['NTRACER_VARIABLES'] = str(ntracer)
 
 # set total number of hydro variables
 definitions['NMASS_VARIABLES'] = str(1 + 2*nvapor + ntracer)
 definitions['NHYDRO_VARIABLES'] = str(int(definitions['NHYDRO_VARIABLES']) + 2*nvapor + ntracer)
+
+# -precip argument
+if args['precip']:
+  definitions['PRECIPITATION_ENABLED'] = '1'
+else:
+  definitions['PRECIPITATION_ENABLED'] = '0'
 
 # -b argument
 # set variety of macros based on whether MHD/hydro or adi/iso are defined
@@ -445,6 +461,7 @@ print('  Coordinate system:       ' + args['coord'])
 print('  Equation of state:       ' + args['eos'])
 print('  Number of tracers:       ' + args['ntracer'])
 print('  Number of vapors:        ' + args['nvapor'])
+print('  Precipitation:           ' + ('ON' if args['precip'] else 'OFF'))
 print('  Riemann solver:          ' + args['flux'])
 print('  Reconstruction method:   ' + args['order'])
 print('  Magnetic fields:         ' + ('ON' if args['b'] else 'OFF'))

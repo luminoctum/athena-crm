@@ -555,6 +555,7 @@ enum TaskStatus TimeIntegratorTaskList::ApplyMicrophysics(MeshBlock *pmb, int st
 {
   Microphysics *pmicro = pmb->pmicro;
   Hydro *ph = pmb->phydro;
+  Field *pf = pmb->pfield;
   // return if there are no source terms to be added
   if (pmicro->ncycle == 0) return TASK_NEXT;
 
@@ -562,8 +563,16 @@ enum TaskStatus TimeIntegratorTaskList::ApplyMicrophysics(MeshBlock *pmb, int st
   if (step < nsub_steps) return TASK_NEXT;
 
   // do microphysics every xx step
+  int is=pmb->is, ie=pmb->ie, js=pmb->js, je=pmb->je, ks=pmb->ks, ke=pmb->ke;
   if (pmb->pmy_mesh->ncycle % pmicro->ncycle == 0) {
-    pmicro->SaturationAdjust(ph->w,ph->u);
+    pmicro->SaturationAdjustment(ph->w,is,ie,js,je,ks,ke);
+    if (PRECIPITATION_ENABLED) {
+      Real dt = pmb->pmy_mesh->dt*pmicro->ncycle;
+      pmicro->Precipitation(ph->w,ph->u,dt,is,ie,js,je,ks,ke);
+      pmicro->Evaporation(ph->w,ph->u,dt);
+    }
+    pmb->peos->PrimitiveToConserved(ph->w, pf->bcc, ph->u, pmb->pcoord,
+      is, ie, js, je, ks, ke);
   }
 
   return TASK_SUCCESS;

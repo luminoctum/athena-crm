@@ -37,6 +37,15 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
     latent_[1+n] = atof(str[n].c_str());
     latent_[1+NVAPOR+n] = atof(str[n].c_str());
   }
+
+  // terminal velocity
+  tv_ = pin->GetOrAddReal("microphysics", "terminalv", 0.);
+
+  // auto conversion time
+  autoc_ = pin->GetOrAddReal("microphysics", "autoc", 0.);
+
+  // tiny number
+  tiny_number_ = pin->GetOrAddReal("microphysics", "tiny_number", 1.E-20);
 }
 
 Microphysics::~Microphysics()

@@ -365,11 +365,20 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
   // vapor
   if (NVAPOR > 0) {
     if (output_params.variable.compare("prim") == 0 ||
-        output_params.variable.compare("gas") == 0) {
+        output_params.variable.compare("vapor") == 0) {
       pod = new OutputData;
       pod->type = "VECTORS";
       pod->name = "vapor";
       pod->data.InitWithShallowSlice(phyd->w,4,1,NVAPOR);
+      AppendOutputDataNode(pod);
+      num_vars_+=NVAPOR;
+    }
+
+    if (output_params.variable.compare("cons") == 0) {
+      pod = new OutputData;
+      pod->type = "VECTORS";
+      pod->name = "vapor";
+      pod->data.InitWithShallowSlice(phyd->u,4,1,NVAPOR);
       AppendOutputDataNode(pod);
       num_vars_+=NVAPOR;
     }
@@ -386,6 +395,15 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
       AppendOutputDataNode(pod);
       num_vars_+=NVAPOR;
     }
+
+    if (output_params.variable.compare("cons") == 0) {
+      pod = new OutputData;
+      pod->type = "VECTORS";
+      pod->name = "cloud";
+      pod->data.InitWithShallowSlice(phyd->u,4,ICD,NVAPOR);
+      AppendOutputDataNode(pod);
+      num_vars_+=NVAPOR;
+    }
   }
 
   // tracer
@@ -396,6 +414,15 @@ void OutputType::LoadOutputData(MeshBlock *pmb)
       pod->type = "VECTORS";
       pod->name = "tracer";
       pod->data.InitWithShallowSlice(phyd->w,4,ITR,NTRACER);
+      AppendOutputDataNode(pod);
+      num_vars_+=NTRACER;
+    }
+
+    if (output_params.variable.compare("cons") == 0) {
+      pod = new OutputData;
+      pod->type = "VECTORS";
+      pod->name = "tracer";
+      pod->data.InitWithShallowSlice(phyd->u,4,ITR,NTRACER);
       AppendOutputDataNode(pod);
       num_vars_+=NTRACER;
     }

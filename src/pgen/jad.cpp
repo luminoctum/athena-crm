@@ -11,6 +11,8 @@
 #include "../math_funcs.hpp"
 #include "../microphysics/microphysics.hpp"
 
+enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
+
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   AllocateUserOutputVariables(2);
@@ -35,6 +37,17 @@ void MeshBlock::UserWorkInLoop()
         user_out_var(0,k,j,i) = temp;
         user_out_var(1,k,j,i) = temp*pow(p0/pres, (gamma - 1.)/gamma);
       }
+
+  /* test whether the result will change if I add back all the condensates
+  for (int k = ks; k <= ke; ++k)
+    for (int j = js; j <= je; ++j)
+      for (int i = is; i <= ie; ++i)
+        for (int n = 1; n <= NVAPOR; ++n) {
+          phydro->u(n,k,j,i) += phydro->u(n+NVAPOR,k,j,i);
+          phydro->u(n+NVAPOR,k,j,i) = 0.;
+        }
+  peos->ConservedToPrimitive(phydro->u, phydro->w, pfield->b, phydro->w, pfield->bcc,
+    pcoord, is, ie, js, je, ks, ke);*/
 }
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
@@ -47,7 +60,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real P0 = pin->GetReal("problem", "P0");
   Real T0 = pin->GetReal("problem", "T0");
 
-  int iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4;
   for (int i = is; i <= ie; ++i) {
     Real x1 = pcoord->x1v(i);
     Real temp = T0 - grav*x1/cp;
@@ -64,6 +76,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
     phydro->w(IDN,i) = phydro->w(IPR,i)*mu/(Rd*temp);
   }
+
+  phydro->w(iH2Op,is) = 0.1;
 
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 

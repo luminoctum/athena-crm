@@ -104,6 +104,19 @@ File added:
 * src/pgen/jad.cpp
 * src/utils/logging_info.hpp
 
+15. add precipitation/evaporation
+File changed:
+* configure.py
+* src/defs.hpp.in
+* src/hydro/rsolvers/hydro/lmars.cpp
+* src/microphysics/microphysics.hpp
+* src/microphysics/microphysics.cpp
+* src/output/outputs.cpp
+* src/pgen/jad.cpp
+* src/task_list/time_integrator.cpp
+File added:
+* src/microphysics/saturation_adjust_jupiter.cpp -> src/microphysics/jupiter_microphysics.cpp
+
 ## Known bugs (but didn't have time to correct it)
 1. flip_across_pole_hydro
 Only works with standard hydro

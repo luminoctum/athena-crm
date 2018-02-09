@@ -5,6 +5,7 @@
 #include "../../hydro.hpp"
 #include "../../../athena.hpp"
 #include "../../../athena_arrays.hpp"
+#include "../../../microphysics/microphysics.hpp"
 #include "../../../eos/eos.hpp"
 //#include "../../../math_funcs.hpp"
 
@@ -15,17 +16,18 @@ void Hydro::RiemannSolver(int const k, int const j, int const il, int const iu,
   int ivy = IVX + ((ivx-IVX)+1)%3;
   int ivz = IVX + ((ivx-IVX)+2)%3;
 
+  Microphysics *pmicro = pmy_block->pmicro;
   EquationOfState *peos = pmy_block->peos;
   Real rhobar, pbar, cbar, ubar, hl, hr;
   //Real gamma = pmy_block->peos->GetGamma();
   //Real kappa = 1. - 1./gamma;
 
-  Real rho[1+NVAPOR];
+  Real rho[1+2*NVAPOR];
   for (int i = il; i <= iu; ++i) {
     // correction for gamma
     Real gmix = 1.;
     for (int n = 1; n < ITR; ++n)
-      gmix += 0.5*(wl(n,i) + wr(n,i))*(peos->GetCvRatio(n) - 1.);
+      gmix += 0.5*(wl(n,i) + wr(n,i))*(pmicro->GetCvRatio(n) - 1.);
     Real gamma = (peos->GetGamma() - 1. + gmix)/gmix;
     Real kappa = 1. - 1./gamma;
 
@@ -40,7 +42,7 @@ void Hydro::RiemannSolver(int const k, int const j, int const il, int const iu,
       // volume mixing ratio to mass mixing ratio
       Real qd = 1., sum = 0.;
       for (int n = 1; n < ITR; ++n) {
-        rho[n] = wl(n,i)*peos->GetMassRatio(n);
+        rho[n] = wl(n,i)*pmicro->GetMassRatio(n);
         qd -= wl(n,i);
         sum += rho[n];
       }
@@ -57,7 +59,7 @@ void Hydro::RiemannSolver(int const k, int const j, int const il, int const iu,
       // volume mixing ratio to mass mixing ratio
       Real qd = 1., sum = 0.;
       for (int n = 1; n < ITR; ++n) {
-        rho[n] = wr(n,i)*peos->GetMassRatio(n);
+        rho[n] = wr(n,i)*pmicro->GetMassRatio(n);
         qd -= wr(n,i);
         sum += rho[n];
       }

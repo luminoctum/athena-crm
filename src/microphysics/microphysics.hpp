@@ -22,7 +22,7 @@ public:
   Real GetCvRatio(int n) const {return rcv_[n];}
   Real GetLatent(int n) const {return latent_[n];}
   Real GetMassRatio(int n) const {return eps_[n];}
-  void SaturationAdjust(AthenaArray<Real> &w, AthenaArray<Real> &u);
+  Real GetTerminalVelocity() const {return tv_;}
 
   Real Temperature(Real prim[NHYDRO]) const {
     Real qa = 1.;
@@ -45,12 +45,21 @@ public:
     return Rd_*qa/qb/(gamma - 1.);
   }
 
+  void SaturationAdjustment(AthenaArray<Real> &w,
+    int is, int ie, int js, int je, int ks, int ke);
+  void Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const &u, Real dt,
+    int is, int ie, int js, int je, int ks, int ke);
+  void Evaporation(AthenaArray<Real> &w, AthenaArray<Real> const &u, Real dt);
+
 private:
   MeshBlock *pmy_block_;
-  Real Rd_;
+  Real Rd_;                   // gas constant of dry air
   Real eps_[1+2*NVAPOR];
   Real rcv_[1+2*NVAPOR];
   Real latent_[1+2*NVAPOR];
+  Real tv_;                   // terminal velocity
+  Real autoc_;                // auto-conversion time
+  Real tiny_number_;          // very small number
 };
 
 #endif
