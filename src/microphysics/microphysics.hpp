@@ -34,15 +34,15 @@ public:
     return (prim[IPR]*qb)/(prim[IDN]*Rd_*qa);
   }
 
-  // Volume heat capacity
-  Real HeatCapacity(Real prim[NHYDRO]) const {
+  // heat capacity
+  Real Cp(Real prim[NHYDRO]) const {
     Real qa = 1., qb = 1.;
     Real gamma = pmy_block_->peos->GetGamma();
     for (int n = 1; n < ITR; ++n) {
       qa += prim[n]*(rcv_[n] - 1.);
       qb += prim[n]*(eps_[n] - 1.);
     }
-    return Rd_*qa/qb/(gamma - 1.);
+    return gamma/(gamma - 1.)*Rd_*qa/qb;
   }
 
   void SaturationAdjustment(AthenaArray<Real> &w,

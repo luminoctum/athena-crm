@@ -2,6 +2,7 @@
 #include "../parameter_input.hpp"
 #include "../utils/utils.hpp"
 #include "../mesh/mesh.hpp"
+#include "../hydro/hydro.hpp"
 
 Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
 {

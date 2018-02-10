@@ -101,7 +101,7 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
         for (int n = ICD; n < ICD + NVAPOR; ++n)
           qtol -= prim[n];
 
-        int iter = 0, max_iter = 6;
+        int iter = 0, max_iter = 10;
         Real temp;
         //LoggingInfo<double> log1("dT");
         while (fabs(dT) > 1.E-4 && iter < max_iter) {

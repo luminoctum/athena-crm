@@ -125,6 +125,7 @@ TimeIntegratorTaskList::TimeIntegratorTaskList(ParameterInput *pin, Mesh *pm)
     AddTimeIntegratorTask(MICROPHY,CON2PRIM);
 
     // everything else
+    //AddTimeIntegratorTask(PHY_BVAL,CON2PRIM);
     AddTimeIntegratorTask(PHY_BVAL,MICROPHY);
     AddTimeIntegratorTask(USERWORK,PHY_BVAL);
     AddTimeIntegratorTask(NEW_DT,USERWORK);
@@ -569,7 +570,7 @@ enum TaskStatus TimeIntegratorTaskList::ApplyMicrophysics(MeshBlock *pmb, int st
     if (PRECIPITATION_ENABLED) {
       Real dt = pmb->pmy_mesh->dt*pmicro->ncycle;
       pmicro->Precipitation(ph->w,ph->u,dt,is,ie,js,je,ks,ke);
-      pmicro->Evaporation(ph->w,ph->u,dt);
+      //pmicro->Evaporation(ph->w,ph->u,dt);
     }
     pmb->peos->PrimitiveToConserved(ph->w, pf->bcc, ph->u, pmb->pcoord,
       is, ie, js, je, ks, ke);
