@@ -55,18 +55,27 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real grav = -phydro->psrc->GetG1();
   Real gamma = peos->GetGamma();
   Real Rd = pmicro->GetRd();
-  Real cp = Rd*gamma/(gamma - 1.);
+  Real cpd = Rd*gamma/(gamma - 1.);
 
   Real P0 = pin->GetReal("problem", "P0");
   Real T0 = pin->GetReal("problem", "T0");
+
+  Real xH2O = pin->GetReal("problem", "xH2O");
+  Real xNH3 = pin->GetReal("problem", "xNH3");
+
+  Real prim[NHYDRO];
+  for (int n = 0; n < NHYDRO; ++n) prim[n] = 0.;
+  prim[iNH3] = xNH3;
+  prim[iH2O] = xH2O;
+  Real cp = pmicro->Cp(prim);
 
   for (int i = is; i <= ie; ++i) {
     Real x1 = pcoord->x1v(i);
     Real temp = T0 - grav*x1/cp;
     phydro->w(IPR,i) = P0*pow(temp/T0, cp/Rd);
-    phydro->w(iH2O,i) = 5.E-3;
+    phydro->w(iH2O,i) = xH2O;
     phydro->w(iH2Oc,i) = 0.0;
-    phydro->w(iNH3,i) = 350.E-6;
+    phydro->w(iNH3,i) = xNH3;
     phydro->w(iNH3c,i) = 0.0;
 
     // calculate virtual temperature
@@ -77,9 +86,15 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     phydro->w(IDN,i) = phydro->w(IPR,i)*mu/(Rd*temp);
   }
 
-  phydro->w(iH2Op,is) = 0.1;
+  phydro->w(iH2Op,is) = 0.0;
+
+  pmicro->SaturationAdjustment(phydro->w, is, ie, js, je, ks, ke);
 
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
+
+  pmicro->Precipitation(phydro->w, phydro->u, 200., is, ie ,js, je, ks, ke);
+  pmicro->Evaporation(phydro->w, phydro->u, 1.);
+
 
   /* debug
   for (int n = 0; n < NHYDRO; ++n)
@@ -95,4 +110,5 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   for (int n = 0; n < NHYDRO; ++n)
     std::cout << phydro->w(n,(is+ie)/2.) << " ";
   std::cout << std::endl;*/
+  peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 }

@@ -22,7 +22,7 @@ public:
   Real GetCvRatio(int n) const {return rcv_[n];}
   Real GetLatent(int n) const {return latent_[n];}
   Real GetMassRatio(int n) const {return eps_[n];}
-  Real GetTerminalVelocity() const {return tv_;}
+  Real GetTerminalVelocity() const {return termv_;}
 
   Real Temperature(Real prim[NHYDRO]) const {
     Real qa = 1.;
@@ -57,8 +57,10 @@ private:
   Real eps_[1+2*NVAPOR];
   Real rcv_[1+2*NVAPOR];
   Real latent_[1+2*NVAPOR];
-  Real tv_;                   // terminal velocity
+
+  Real termv_;                // terminal velocity
   Real autoc_;                // auto-conversion time
+  Real evapr_;                // evaporation rate
   Real tiny_number_;          // very small number
 };
 
