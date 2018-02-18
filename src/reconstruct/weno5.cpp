@@ -92,7 +92,7 @@ void Reconstruction::HighResFuncX3(const int k, const int j,
   for (int n=0; n<NHYDRO; ++n) {
 #pragma simd
     for (int i=il; i<=iu; ++i){
-      ql(n,i) = interp_weno5(q(n,k-3,j,i),q(n,k-2,j,i),q(n,k-1,j,i),q(n,k,j,i),q(n,k,j,i+1));
+      ql(n,i) = interp_weno5(q(n,k-3,j,i),q(n,k-2,j,i),q(n,k-1,j,i),q(n,k,j,i),q(n,k+1,j,i));
       qr(n,i) = interp_weno5(q(n,k+2,j,i),q(n,k+1,j,i),q(n,k,j,i),q(n,k-1,j,i),q(n,k-2,j,i));
     }
   }
