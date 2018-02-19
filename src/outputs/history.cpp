@@ -26,7 +26,7 @@
 #include "../mesh/mesh.hpp"
 #include "outputs.hpp"
 
-#define NHISTORY_VARS ((NHYDRO)+(NFIELD)+3)
+#define NHISTORY_VARS ((NHYDRO)+(NFIELD))
 
 //----------------------------------------------------------------------------------------
 // HistoryOutput constructor
@@ -68,18 +68,22 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
         Real& u_my = phyd->u(IM2,k,j,i);
         Real& u_mz = phyd->u(IM3,k,j,i);
 
-        data_sum[0] += vol(i)*u_d;
-        data_sum[1] += vol(i)*u_mx;
-        data_sum[2] += vol(i)*u_my;
-        data_sum[3] += vol(i)*u_mz;
-        data_sum[4] += vol(i)*0.5*SQR(u_mx)/u_d;
-        data_sum[5] += vol(i)*0.5*SQR(u_my)/u_d;
-        data_sum[6] += vol(i)*0.5*SQR(u_mz)/u_d;
+        for (int n = 0; n < NMASS; ++n)
+          data_sum[n] += vol(i)*phyd->u(n,k,j,i);
+        //data_sum[0] += vol(i)*u_d;
+        data_sum[IM1] += vol(i)*u_mx;
+        data_sum[IM2] += vol(i)*u_my;
+        data_sum[IM3] += vol(i)*u_mz;
 
         if (NON_BAROTROPIC_EOS) {
           Real& u_e = phyd->u(IEN,k,j,i);;
-          data_sum[7] += vol(i)*u_e;
+          data_sum[IEN] += vol(i)*u_e;
         }
+
+        //data_sum[IEN+1] += vol(i)*0.5*SQR(u_mx)/u_d;
+        //data_sum[IEN+2] += vol(i)*0.5*SQR(u_my)/u_d;
+        //data_sum[IEN+3] += vol(i)*0.5*SQR(u_mz)/u_d;
+
         if (MAGNETIC_FIELDS_ENABLED) {
           Real& bcc1 = pfld->bcc(IB1,k,j,i);
           Real& bcc2 = pfld->bcc(IB2,k,j,i);
@@ -130,14 +134,15 @@ void HistoryOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
       fprintf(pfile,"# Athena++ history data\n"); // descriptor is first line
       fprintf(pfile,"# [%d]=time     ", iout++);
       fprintf(pfile,"[%d]=dt       ", iout++);
-      fprintf(pfile,"[%d]=mass     ", iout++);
-      fprintf(pfile,"[%d]=1-mom    ", iout++);
-      fprintf(pfile,"[%d]=2-mom    ", iout++);
-      fprintf(pfile,"[%d]=3-mom    ", iout++);
-      fprintf(pfile,"[%d]=1-KE     ", iout++);
-      fprintf(pfile,"[%d]=2-KE     ", iout++);
-      fprintf(pfile,"[%d]=3-KE     ", iout++);
+      for (int n = 0; n < NMASS; ++n)
+        fprintf(pfile,"[%d]=mass %d   ", iout++, n + 1);
+      fprintf(pfile,"[%d]=1-mom   ", iout++);
+      fprintf(pfile,"[%d]=2-mom   ", iout++);
+      fprintf(pfile,"[%d]=3-mom   ", iout++);
       if (NON_BAROTROPIC_EOS) fprintf(pfile,"[%d]=tot-E   ", iout++);
+      //fprintf(pfile,"[%d]=1-KE     ", iout++);
+      //fprintf(pfile,"[%d]=2-KE     ", iout++);
+      //fprintf(pfile,"[%d]=3-KE     ", iout++);
       if (MAGNETIC_FIELDS_ENABLED) {
         fprintf(pfile,"[%d]=1-ME    ", iout++);
         fprintf(pfile,"[%d]=2-ME    ", iout++);
