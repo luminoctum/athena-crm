@@ -46,6 +46,7 @@ enum {IDN=0, IVP=1, ICD=1+NVAPOR, ITR=1+2*NVAPOR, IM1=NMASS, IM2=NMASS+1, IM3=NM
 enum {IB1=0, IB2=1, IB3=2};
 
 // array indices for 1D primitives: velocity, transverse components of field
+enum {IV1=NMASS, IV2=NMASS+1, IV3=NMASS+2};  // to replace the legacy definition of IVX,IVY,IVZ
 enum {IVX=NMASS, IVY=NMASS+1, IVZ=NMASS+2, IPR=NMASS+3, IBY=(NHYDRO), IBZ=((NHYDRO)+1)};
 
 // array indices for face-centered electric fields returned by Riemann solver

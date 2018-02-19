@@ -4,43 +4,33 @@
 #include "../hydro/hydro.hpp"
 #include "../math_funcs.hpp"
 #include "microphysics.hpp"
-#include "../utils/logging_info.hpp"  // for debug
 
 // molecule index
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
 
-// thermodynamics
-Real const p3_H2O = 611.7;
-Real const t3_H2O = 273.16;
-Real const beta_H2O = 22.98;
-Real const gamma_H2O = 0.52;
-
-Real const p3_NH3 = 6060.;
-Real const t3_NH3 = 195.4;
-Real const beta_NH3 = 20.64;
-Real const gamma_NH3 = 1.43;
-
-inline Real SatVaporPresIdeal(Real t, Real p3, Real beta, Real gamma) {
-  return p3*exp((1. - 1./t)*beta - gamma*log(t));
+inline Real SatVaporPresIdeal(Real t, Real p3, Real beta, Real delta) {
+  return p3*exp((1. - 1./t)*beta - delta*log(t));
 }
 
 // alpha = L/cv evaluated at current temperature
-inline Real GasCloudIdeal(Real const prim[], int iv, int ic, Real temp,
-  Real p3, Real t3, Real alpha, Real beta, Real gamma)
+inline Real GasCloudIdeal(Real const prim[], int iv, int ic,
+  Real p3, Real t3, Real alpha, Real beta, Real delta)
 {
   Real xv = prim[iv];
   Real xc = prim[ic];
-  Real s = SatVaporPresIdeal(temp/t3,p3,beta,gamma)/prim[IPR];
+  Real t = prim[IDN]/t3;
+  Real s = SatVaporPresIdeal(t,p3,beta,delta)/prim[IPR];
 
   // if saturation vapor pressure is larger than the total pressure
   // evaporate all condensates
   if (s > 1.) return -xc;
 
-  Real xt = 1.;
-  for (int n = ICD; n < ICD + NVAPOR; ++n) xt -= prim[n];
+  Real g = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n) g -= prim[n];
+  g -= xv;
 
-  Real dsdt = s/temp*(beta/temp*t3 - gamma);
-  Real rate = (xv - s*xt)/((1. - s)*(1. + alpha*(xt - xv)/_sqr(1. - s)*dsdt));
+  Real s1 = s/(1. - s);
+  Real rate = (xv - s1*g)/(1. + alpha*g*(beta/t - delta)*s1/(1. - s));
 
   // condensate at most xv vapor
   if (rate > 0.) rate = std::min(rate, xv);
@@ -50,8 +40,7 @@ inline Real GasCloudIdeal(Real const prim[], int iv, int ic, Real temp,
   return rate;
 }
 
-void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
-  int is, int ie, int js, int je, int ks, int ke)
+void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
 {
   std::stringstream msg;
   Real prim[NHYDRO];
@@ -59,61 +48,108 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &w,
   MeshBlock *pmb = pmy_block_;
   Real gamma = pmb->peos->GetGamma();
 
-  for (int k = ks; k <= ke; ++k)
-    for (int j = js; j <= je; ++j)
-      for (int i = is; i <= ie; ++i) {
-        for (int n = 0; n < NHYDRO; ++n) prim[n] = w(n,k,j,i);
-
-        Real gmix = 1., qmass = 1.;
+  for (int k = pmb->ks; k <= pmb->ke; ++k)
+    for (int j = pmb->js; j <= pmb->je; ++j)
+      for (int i = pmb->is; i <= pmb->ie; ++i) {
+        Real rho = u(IDN,k,j,i), sum = 1.;
         for (int n = 1; n < ITR; ++n) {
-          gmix += prim[n]*(rcv_[n] - 1.);
-          qmass += prim[n]*(eps_[n] - 1.);
+          rho += u(n,k,j,i);
+          prim[n] = u(n,k,j,i)/u(IDN,k,j,i)/eps_[n];
+          sum += prim[n];
         }
-        Real alpha_H2O = -(gamma - 1.)*latent_[iH2Oc]*eps_[iH2O]/(Rd_*gmix);
-        Real alpha_NH3 = -(gamma - 1.)*latent_[iNH3c]*eps_[iNH3]/(Rd_*gmix);
+        for (int n = 1; n < ITR; ++n)
+          prim[n] /= sum;
 
-        Real dT = 1., qtol = 1., rate;
-        for (int n = ICD; n < ICD + NVAPOR; ++n)
-          qtol -= prim[n];
+        // total energy
+        Real u0 = 0., cv = 1.;
+        for (int n = 1; n < ICD; ++n)
+          u0 -= beta_[n]*t3_[n]*prim[n+NVAPOR];
+        for (int n = 1; n < ITR; ++n)
+          cv += (rcv_[n]*eps_[n] - 1.)*prim[n];
+        u0 += 1./(gamma - 1)*cv*T(k,j,i);
+
+        Real qsig = 1., qeps = 1., qtol = 1.;
+        for (int n = 1; n < ICD; ++n) {
+          qsig += (prim[n] + prim[n+NVAPOR])*(rcv_[n]*eps_[n] - 1.);
+          qeps += (prim[n] + prim[n+NVAPOR])*(eps_[n] - 1.);
+          qtol -= prim[n+NVAPOR];
+        }
+
+        prim[IDN] = T(k,j,i);
+        prim[IPR] = rho*Rd_*T(k,j,i)*qtol/qeps;
 
         int iter = 0, max_iter = 10;
-        Real temp;
-        //LoggingInfo<double> log1("dT");
-        while (fabs(dT) > 1.E-4 && iter < max_iter) {
-          temp = Temperature(prim);
-          // H2O - H2O(s)
-          rate = GasCloudIdeal(prim, iH2O, iH2Oc, temp,
-            p3_H2O, t3_H2O, alpha_H2O, beta_H2O, gamma_H2O);
-          prim[iH2O] -= rate;
-          prim[iH2Oc] += rate;
-          dT = alpha_H2O*rate;
-          qtol -= rate;
+        // debug
+        //std::cout << "Adjustment start, u = " << u(IEN,k,j,i) << std::endl;
 
-          // NH3 - NH3(s)
-          rate = GasCloudIdeal(prim, iNH3, iNH3c, temp + dT,
-            p3_NH3, t3_NH3, alpha_NH3, beta_NH3, gamma_NH3);
-          prim[iNH3] -= rate;
-          prim[iNH3c] += rate;
-          dT += alpha_NH3*rate;
-          qtol -= rate;
+        Real Told = 0.;
+        while (fabs(prim[IDN] - Told) > 1.E-4 && iter < max_iter) {
+          /* debug 
+          for (int n = 0; n < ITR; ++n)
+            std::cout << prim[n] << " ";
+          std::cout << prim[IPR] << " ";
+          std::cout <<
+          SatVaporPresIdeal(prim[IDN]/t3_[iH2O],p3_[iH2O],beta_[iH2O],beta_[iH2Oc])
+          << std::endl;*/
+
+          Real t, alpha, rate, u1;
+          
+          // condensation
+          for (int n = 1; n < 1 + NVAPOR; ++n) {
+            int nc = n + NVAPOR;
+            t = prim[IDN]/t3_[n];
+            alpha = (gamma - 1.)*(beta_[n]/t - beta_[nc] - 1.)/qsig;
+            rate = GasCloudIdeal(prim, n, nc,
+              p3_[n], t3_[n], alpha, beta_[n], beta_[nc]);
+            prim[n] -= rate;
+            prim[nc] += rate;
+            qtol -= rate;
+          }
+
+          // calculate new temperature
+          u1 = u0, cv = 1.;
+          for (int n = 1; n < ICD; ++n)
+            u1 += beta_[n]*t3_[n]*prim[n+NVAPOR];
+          for (int n = 1; n < ITR; ++n)
+            cv += (rcv_[n]*eps_[n] - 1.)*prim[n];
+          Told = prim[IDN];
+          prim[IDN] = (gamma - 1.)*u1/cv;
 
           // adjust pressure
-          prim[IPR] = prim[IDN]*Rd_*(temp + dT)*qtol/qmass;
+          prim[IPR] = rho*Rd_*prim[IDN]*qtol/qeps;
           iter++;
-          if (iter >= max_iter) {
-            std::cerr << "Saturation Adjustment Iteration reaches maximum." << std::endl;
-            //throw std::runtime_error(msg.str().c_str());
-          }
-          //log1 << temp << dT << SatVaporPresH2OIdeal(temp+dT);
+          if (iter >= max_iter)
+            std::cerr << "Saturation Adjustment Iteration reaches maximum."
+                      << std::endl;
         }
+        // debug
+        //std::cout << "Adjustment end, u = ";
 
-        // adjust primitive variables
-        for (int n = 0; n < NHYDRO; ++n) w(n,k,j,i) = prim[n];
+        // molar to mass mixing ratios
+        sum = 1.;
+        for (int n = 1; n < ITR; ++n) {
+          sum += prim[n]*(eps_[n] - 1.);
+          prim[n] *= eps_[n];
+        }
+        for (int n = 1; n < ITR; ++n)
+          u(n,k,j,i) = rho*prim[n]/sum;
+
+        // update temperature
+        T(k,j,i) = prim[IDN];
+
+        /* debug recalculate energy
+        Real cvd = Rd_/(gamma - 1);
+        Real ue = u(IDN,k,j,i)*cvd*prim[IDN];
+        for (int n = 1; n < ITR; ++n)
+          ue += u(n,k,j,i)*rcv_[n]*cvd*prim[IDN];
+        ue += 0.5/rho*(_sqr(u(IM1,k,j,i)) + _sqr(u(IM2,k,j,i)) + _sqr(u(IM3,k,j,i)));
+        for (int n = ICD; n < ICD + NVAPOR; ++n)
+          ue += latent_[n]*u(n,k,j,i);
+        std::cout << ue << std::endl << std::endl;*/
       }
 }
 
-void Microphysics::Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const& u, Real dt,
-  int is, int ie, int js, int je, int ks, int ke)
+void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
 {
   std::stringstream msg;
   if (dt > autoc_) {
@@ -121,97 +157,47 @@ void Microphysics::Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const& 
     msg << "Microphysics time step smaller than autoconversion time" << std::endl;
     throw std::runtime_error(msg.str().c_str());
   }
+  MeshBlock *pmb = pmy_block_;
+  Real gamma = pmb->peos->GetGamma();
 
-  for (int k = ks; k <= ke; ++k)
-    for (int j = js; j <= je; ++j)
-      for (int i = is; i <= ie; ++i) {
-        Real dq, drho, rho = w(IDN,k,j,i);
-        bool normalize = false;
-
-        // volume mixing ratio to mass mixing ratio
-        Real qd = 1., qtol = 1.;
-        for (int n = 1; n < ITR; ++n)
-          qd -= w(n,k,j,i);
-
-        // H2O
-        if (w(iH2Oc,k,j,i) > tiny_number_) {
-          dq = w(iH2Oc,k,j,i)*dt/autoc_;
-          drho = u(IDN,k,j,i)*dq/qd*eps_[iH2O];
-          w(iH2Oc,k,j,i) -= dq;
-          w(iH2Op,k,j,i) += drho;
-          w(IDN,k,j,i) -= drho;
-          qtol -= dq;
-          normalize = true;
+  for (int k = pmb->ks; k <= pmb->ke; ++k)
+    for (int j = pmb->js; j <= pmb->je; ++j)
+      for (int i = pmb->is; i <= pmb->ie; ++i)
+        for (int n = 0; n < NVAPOR; ++n) {
+          Real drho;
+          int nc = ICD + n;
+          int np = ITR + n;
+          if (u(nc,k,j,i) > tiny_number_) {
+            if (recondense_(n,k,j,i))
+              drho = u(nc,k,j,i);
+            else
+              drho = u(nc,k,j,i)*dt/autoc_;
+            u(nc,k,j,i) -= drho;
+            u(np,k,j,i) += drho;
+            u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
+          }
         }
-
-        // NH3
-        if (w(iNH3c,k,j,i) > tiny_number_) {
-          dq = w(iNH3c,k,j,i)*dt/autoc_;
-          drho = u(IDN,k,j,i)*dq/qd*eps_[iNH3];
-          w(iNH3c,k,j,i) -= dq;
-          w(iNH3p,k,j,i) += drho;
-          w(IDN,k,j,i) -= drho;
-          qtol -= dq;
-          normalize = true;
-        }
-
-        if (normalize) {
-          for (int n = 1; n < ITR; ++n)
-            w(n,k,j,i) /= qtol;
-          w(iH2Op,k,j,i) *= rho/w(IDN,k,j,i);
-          w(iNH3p,k,j,i) *= rho/w(IDN,k,j,i);
-        }
-      }
 }
 
-void Microphysics::Evaporation(AthenaArray<Real> &w, AthenaArray<Real> const& u, Real dt)
+void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
 {
   MeshBlock *pmb = pmy_block_;
 
   for (int k = pmb->ks; k <= pmb->ke; ++k)
     for (int j = pmb->js; j <= pmb->je; ++j)
-      for (int i = pmb->is; i <= pmb->ie; ++i) {
-        Real dq, drho, rho = w(IDN,k,j,i);
-        bool normalize = false;
-
-        Real qd = 1., qtol = 1.;
-        for (int n = 1; n < ITR; ++n)
-          qd -= w(n,k,j,i);
-
-        // approximate temperature
-        Real temp = w(IPR,k,j,i)/(w(IDN,k,j,i)*Rd_);
-
-        // H2O
-        if (w(iH2Oc,k,j,i) < tiny_number_ && w(iH2Op,k,j,i) > tiny_number_) {
-          // limit evaporation rate
-          drho = std::min(dt*evapr_*exp(-t3_H2O*beta_H2O/temp), rho*w(iH2Op,k,j,i));
-          dq = drho/u(IDN,k,j,i)*qd/eps_[iH2O];
-          w(iH2Oc,k,j,i) += dq;
-          w(IDN,k,j,i) += drho;
-          w(iH2Op,k,j,i) -= drho/rho;
-          qtol += dq;
-          normalize = true;
+      for (int i = pmb->is; i <= pmb->ie; ++i)
+        for (int n = 0; n < NVAPOR; ++n) {
+          int ng = 1 + n;
+          int nc = ICD + n;
+          int np = ITR + n;
+          recondense_(n,k,j,i) = false;
+          if (u(nc,k,j,i) < tiny_number_ && u(np,k,j,i) > tiny_number_) {
+            // limit evaporation rate
+            Real h = exp(-t3_[ng]*beta_[ng]/T(k,j,i));
+            Real drho = std::min(dt*evapr_*h, u(np,k,j,i));
+            u(nc,k,j,i) += drho;
+            u(np,k,j,i) -= drho;
+            recondense_(n,k,j,i) = true;
+          }
         }
-
-        // NH3
-        if (w(iNH3c,k,j,i) < tiny_number_ && w(iNH3p,k,j,i) > tiny_number_) {
-          // limit evaporation rate
-          drho = std::min(dt*evapr_*exp(-t3_NH3*beta_NH3/temp), rho*w(iNH3p,k,j,i));
-          dq = drho/u(IDN,k,j,i)*qd/eps_[iNH3];
-          w(iNH3c,k,j,i) += dq;
-          w(IDN,k,j,i) += drho;
-          w(iNH3p,k,j,i) -= drho/rho;
-          qtol += dq;
-          normalize = true;
-        }
-
-        if (normalize) {
-          for (int n = 1; n < ITR; ++n)
-            w(n,k,j,i) /= qtol;
-          w(iH2Op,k,j,i) *= rho/w(IDN,k,j,i);
-          w(iNH3p,k,j,i) *= rho/w(IDN,k,j,i);
-          SaturationAdjustment(w, i, i, j, j, k, k);
-          Precipitation(w, u, autoc_, i, i, j, j, k, k);
-        }
-      }
 }

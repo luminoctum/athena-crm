@@ -117,6 +117,17 @@ File changed:
 File added:
 * src/microphysics/saturation_adjust_jupiter.cpp -> src/microphysics/jupiter_microphysics.cpp
 
+16. change to mass mixing ratios
+
+File changed:
+* src/athena.hpp
+* src/eos/adiabatic_hydro.cpp
+* src/hydro/rsolver/hydro/lmars.cpp
+* src/microphysics/microphysics.hpp
+* src/microphysics/microphysics.cpp
+* src/microphysics/jupiter_microphysics.cpp
+* src/task_list/time_integrator.cpp
+
 ## Known bugs (but didn't have time to correct it)
 1. flip_across_pole_hydro
 Only works with standard hydro

@@ -71,8 +71,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       if (L <= 1.)
         temp += dT*(cos(M_PI*L) + 1.)/2.;
       phydro->w(IDN,j,i) = phydro->w(IPR,j,i)/(Rd*temp);
-      phydro->w(IVX,j,i) = 0.;
-      phydro->w(IVY,j,i) = 0.;
+      phydro->w(IV1,j,i) = 0.;
+      phydro->w(IV2,j,i) = 0.;
     }
 
   // add tracers if defined

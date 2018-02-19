@@ -24,44 +24,48 @@ public:
   Real GetMassRatio(int n) const {return eps_[n];}
   Real GetTerminalVelocity() const {return termv_;}
 
-  Real Temperature(Real prim[NHYDRO]) const {
-    Real qa = 1.;
-    for (int n = ICD; n < ICD + NVAPOR; ++n)
-      qa -= prim[n];
-    Real qb = 1.;
-    for (int n = 1; n < ITR; ++n)
-      qb += prim[n]*(eps_[n] - 1.);
-    return (prim[IPR]*qb)/(prim[IDN]*Rd_*qa);
-  }
-
   // heat capacity
-  Real Cp(Real prim[NHYDRO]) const {
-    Real qa = 1., qb = 1.;
+  /*Real Cp(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const {
     Real gamma = pmy_block_->peos->GetGamma();
-    for (int n = 1; n < ITR; ++n) {
-      qa += prim[n]*(rcv_[n] - 1.);
-      qb += prim[n]*(eps_[n] - 1.);
-    }
-    return gamma/(gamma - 1.)*Rd_*qa/qb;
+    Real fsig = 1.;
+    for (int n = 1; n < ITR; ++n)
+      fsig += w(n,k,j,i)*(rcp_[n] - 1.);
+    return gamma/(gamma - 1.)*Rd_*fsig;
+  }*/
+  Real Cp(Real prim[]) const {
+    Real gamma = pmy_block_->peos->GetGamma();
+    Real fsig = 1.;
+    for (int n = 1; n < ITR; ++n)
+      fsig += prim[n]*(rcp_[n] - 1.);
+    return gamma/(gamma - 1.)*Rd_*fsig;
   }
 
-  void SaturationAdjustment(AthenaArray<Real> &w,
-    int is, int ie, int js, int je, int ks, int ke);
-  void Precipitation(AthenaArray<Real> &w, AthenaArray<Real> const &u, Real dt,
-    int is, int ie, int js, int je, int ks, int ke);
-  void Evaporation(AthenaArray<Real> &w, AthenaArray<Real> const &u, Real dt);
+  void CalculateTemperature(AthenaArray<Real> const& u);
+  void Evaporation(AthenaArray<Real> &u, Real dt);
+  void SaturationAdjustment(AthenaArray<Real> &u);
+  void Precipitation(AthenaArray<Real> &u, Real dt);
+
+  // temperature
+  AthenaArray<Real> T;
 
 private:
   MeshBlock *pmy_block_;
+  AthenaArray<bool> recondense_;
+
   Real Rd_;                   // gas constant of dry air
   Real eps_[1+2*NVAPOR];
-  Real rcv_[1+2*NVAPOR];
-  Real latent_[1+2*NVAPOR];
+  Real rcp_[1+2*NVAPOR];
+  Real beta_[1+2*NVAPOR];
+  Real t3_[1+NVAPOR];
+  Real p3_[1+NVAPOR];
 
   Real termv_;                // terminal velocity
   Real autoc_;                // auto-conversion time
   Real evapr_;                // evaporation rate
   Real tiny_number_;          // very small number
+
+  Real latent_[1+2*NVAPOR];
+  Real rcv_[1+2*NVAPOR];
 };
 
 #endif

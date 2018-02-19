@@ -26,19 +26,17 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 void MeshBlock::UserWorkInLoop()
 {
   // calculate temperature
-  Real prim[NHYDRO];
   Real p0 = 1.E5;
   Real gamma = peos->GetGamma();
+
+  pmicro->CalculateTemperature(phydro->u);
 
   for (int k = ks; k <= ke; ++k)
     for (int j = js; j <= je; ++j)
       for (int i = is; i <= ie; ++i) {
-        for (int n = 0; n < NHYDRO; ++n)
-          prim[n] = phydro->w(n,k,j,i);
-        Real temp = pmicro->Temperature(prim);
         Real pres = phydro->w(IPR,k,j,i);
-        user_out_var(0,k,j,i) = temp;
-        user_out_var(1,k,j,i) = temp*pow(p0/pres, (gamma - 1.)/gamma);
+        user_out_var(0,k,j,i) = pmicro->T(k,j,i);
+        user_out_var(1,k,j,i) = pmicro->T(k,j,i)*pow(p0/pres, (gamma - 1.)/gamma);
       }
 }
 
@@ -83,13 +81,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
 
   friction = pin->GetReal("problem", "friction");
   heating = pin->GetReal("problem", "heating");
-  Real xH2O = pin->GetReal("problem", "xH2O");
-  Real xNH3 = pin->GetReal("problem", "xNH3");
+  Real qH2O = pin->GetReal("problem", "qH2O");
+  Real qNH3 = pin->GetReal("problem", "qNH3");
 
   Real prim[NHYDRO];
   for (int n = 0; n < NHYDRO; ++n) prim[n] = 0.;
-  prim[iNH3] = xNH3;
-  prim[iH2O] = xH2O;
+  prim[iNH3] = qNH3;
+  prim[iH2O] = qH2O;
   Real cp = pmicro->Cp(prim);
 
   Real kx = 20.*(PI)/(pmy_mesh->mesh_size.x1max - pmy_mesh->mesh_size.x1min);
@@ -102,31 +100,36 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         Real x1 = pcoord->x1v(i);
         Real temp = T0 - grav*x1/cp;
         phydro->w(IPR,k,j,i) = P0*pow(temp/T0, cpd/Rd);
-        phydro->w(iH2O,k,j,i) = xH2O;
+        phydro->w(iH2O,k,j,i) = qH2O;
         phydro->w(iH2Oc,k,j,i) = 0.0;
-        phydro->w(iNH3,k,j,i) = xNH3;
+        phydro->w(iNH3,k,j,i) = qNH3;
         phydro->w(iNH3c,k,j,i) = 0.0;
 
         // calculate virtual temperature
         Real mu = 1.;
         for (int n = 1; n < ITR; ++n)
-          mu += phydro->w(n,k,j,i)*(pmicro->GetMassRatio(n) - 1.);
+          mu += phydro->w(n,k,j,i)*(1./pmicro->GetMassRatio(n) - 1.);
 
-        phydro->w(IDN,k,j,i) = phydro->w(IPR,k,j,i)*mu/(Rd*temp);
+        phydro->w(IDN,k,j,i) = phydro->w(IPR,k,j,i)/(Rd*temp*mu);
         phydro->w(IVX,k,j,i) = 1.*(ran2(&iseed)-0.5)
           *(1.0+cos(kx*pcoord->x1v(i)))*(1.0+cos(ky*pcoord->x2v(j)))/4.0;
       }
 
+  peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord,
+    is, ie, js, je, ks, ke);
+
   // saturation adjustment
-  pmicro->SaturationAdjustment(phydro->w, is, ie, js, je, ks, ke);
+  pmicro->CalculateTemperature(phydro->u);
+  pmicro->SaturationAdjustment(phydro->u);
 
   // remove all condensates
   for (int k = ks; k <= ke; ++k)
     for (int j = js; j <= je; ++j)
       for (int i = is; i <= ie; ++i) {
-        phydro->w(iH2Oc,k,j,i) = 0.0;
-        phydro->w(iNH3c,k,j,i) = 0.0;
+        phydro->u(iH2Oc,k,j,i) = 0.0;
+        phydro->u(iNH3c,k,j,i) = 0.0;
       }
 
-  peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
+  peos->ConservedToPrimitive(phydro->u, phydro->w1, pfield->b, phydro->w, pfield->bcc, pcoord,
+    is, ie, js, je, ks, ke);
 }

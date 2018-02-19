@@ -64,49 +64,48 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
       Real& u_m3 = cons(IM3,k,j,i);
       Real& u_e  = cons(IEN,k,j,i);
 
-      Real& w_vx = prim(IVX,k,j,i);
-      Real& w_vy = prim(IVY,k,j,i);
-      Real& w_vz = prim(IVZ,k,j,i);
-      Real& w_p  = prim(IEN,k,j,i);
+      Real& w_v1 = prim(IV1,k,j,i);
+      Real& w_v2 = prim(IV2,k,j,i);
+      Real& w_v3 = prim(IV3,k,j,i);
+      Real& w_p  = prim(IPR,k,j,i);
 
-
-      Real density = 0., sum = 0.;;
+      Real density = 0.;
       for (int n = 0; n < ITR; ++n) {
         // apply density floor, without changing momentum or energy
         cons(n,k,j,i) = (cons(n,k,j,i) > density_floor_) ?  cons(n,k,j,i) : density_floor_;
         // record total density
         density += cons(n,k,j,i);
-        prim(n,k,j,i) = cons(n,k,j,i)/pmicro->GetMassRatio(n);
-        sum += prim(n,k,j,i);
       }
 
-      // density
+      // total density
       prim(IDN,k,j,i) = density;
+      Real di = 1./density;
 
-      // volume mixing ratio
+      // mass mixing ratio
       for (int n = 1; n < ITR; ++n)
-        prim(n,k,j,i) /= sum;
+        prim(n,k,j,i) = cons(n,k,j,i)*di;
 
       // velocity
-      Real di = 1.0/density;
-      w_vx = u_m1*di;
-      w_vy = u_m2*di;
-      w_vz = u_m3*di;
+      w_v1 = u_m1*di;
+      w_v2 = u_m2*di;
+      w_v3 = u_m3*di;
 
       // internal energy
       Real KE = 0.5*di*(_sqr(u_m1) + _sqr(u_m2) + _sqr(u_m3));
-      Real LE = 0., gtol = 1.;
+      Real LE = 0., fsig = 1., feps = 1.;
       for (int n = ICD; n < ICD + NVAPOR; ++n) {
         LE += pmicro->GetLatent(n)*cons(n,k,j,i);
-        gtol -= prim(n,k,j,i);
+        fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
+        feps -= prim(n,k,j,i);
       }
-      Real gmix = 1.;
-      for (int n = 1; n < ITR; ++n)
-        gmix += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
-      w_p = gm1*(u_e - KE - LE)*gtol/gmix;
+      for (int n = 1; n < ICD; ++n) {
+        fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
+        feps += prim(n,k,j,i)*(1./pmicro->GetMassRatio(n) - 1.);
+      }
+      w_p = gm1*(u_e - KE - LE)*feps/fsig;
 
       // apply pressure floor, correct total energy
-      u_e = (w_p > pressure_floor_) ?  u_e : ((pressure_floor_/gm1*gmix/gtol) + KE + LE);
+      u_e = (w_p > pressure_floor_) ?  u_e : (pressure_floor_/gm1*fsig/feps) + KE + LE;
       w_p = (w_p > pressure_floor_) ?  w_p : pressure_floor_;
 
       // set tracer mass mixing ratio
@@ -147,43 +146,40 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
       Real& u_e  = cons(IEN,k,j,i);
 
       const Real& w_d  = prim(IDN,k,j,i);
-      const Real& w_vx = prim(IVX,k,j,i);
-      const Real& w_vy = prim(IVY,k,j,i);
-      const Real& w_vz = prim(IVZ,k,j,i);
-      const Real& w_p  = prim(IEN,k,j,i);
+      const Real& w_v1 = prim(IV1,k,j,i);
+      const Real& w_v2 = prim(IV2,k,j,i);
+      const Real& w_v3 = prim(IV3,k,j,i);
+      const Real& w_p  = prim(IPR,k,j,i);
 
       // density
-      Real qd = 1., sum = 0.;
+      cons(IDN,k,j,i) = w_d;
       for (int n = 1; n < ITR; ++n) {
-        cons(n,k,j,i) = prim(n,k,j,i)*pmicro->GetMassRatio(n);
-        qd -= prim(n,k,j,i);
-        sum += cons(n,k,j,i);
+        cons(n,k,j,i) = prim(n,k,j,i)*w_d;
+        cons(IDN,k,j,i) -= cons(n,k,j,i);
       }
-      cons(0,k,j,i) = qd;
-      sum += qd;
-      for (int n = 0; n < ITR; ++n)
-        cons(n,k,j,i) = w_d*cons(n,k,j,i)/sum;
 
       // momentum
-      u_m1 = w_vx*w_d;
-      u_m2 = w_vy*w_d;
-      u_m3 = w_vz*w_d;
+      u_m1 = w_v1*w_d;
+      u_m2 = w_v2*w_d;
+      u_m3 = w_v3*w_d;
 
       // total energy
-      Real KE = 0.5*w_d*(_sqr(w_vx) + _sqr(w_vy) + _sqr(w_vz));
-      Real LE = 0., gtol = 1.;
+      Real KE = 0.5*w_d*(_sqr(w_v1) + _sqr(w_v2) + _sqr(w_v3));
+      Real LE = 0., fsig = 1., feps = 1.;
       for (int n = ICD; n < ICD + NVAPOR; ++n) {
         LE += pmicro->GetLatent(n)*cons(n,k,j,i);
-        gtol -= prim(n,k,j,i);
+        fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
+        feps -= prim(n,k,j,i);
       }
-      Real gmix = 1.;
-      for (int n = 1; n < ITR; ++n)
-        gmix += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
-      u_e = w_p/gm1*gmix/gtol + KE + LE;
+      for (int n = 1; n < ICD; ++n) {
+        fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
+        feps += prim(n,k,j,i)*(1./pmicro->GetMassRatio(n) - 1.);
+      }
+      u_e = w_p/gm1*fsig/feps + KE + LE;
 
       // set tracer density
       for (int n = ITR; n < ITR + NTRACER; ++n)
-        cons(n,k,j,i) = w_d*prim(n,k,j,i);
+        cons(n,k,j,i) = prim(n,k,j,i)*w_d;
     }
   }}
 }
@@ -197,11 +193,16 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
 Real EquationOfState::SoundSpeed(const Real prim[NHYDRO])
 {
   Microphysics *pmicro = pmy_block_->pmicro;
-  Real gmix = 1., gtol = 1.;
-  for (int n = 1; n < ITR; ++n)
-    gmix += prim[n]*(pmicro->GetCvRatio(n) - 1.);
-  for (int n = ICD; n < ICD + NVAPOR; ++n)
-    gtol -= prim[n];
-  gmix /= gtol;
-  return sqrt((gamma_ - 1. + gmix)/gmix*prim[IEN]/prim[IDN]);
+
+  Real fsig = 1., feps = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n) {
+    fsig += prim[n]*(pmicro->GetCvRatio(n) - 1.);
+    feps -= prim[n];
+  }
+  for (int n = 1; n < ICD; ++n) {
+    fsig += prim[n]*(pmicro->GetCvRatio(n) - 1.);
+    feps += prim[n]*(1./pmicro->GetMassRatio(n) - 1.);
+  }
+
+  return sqrt((1. + (gamma_ - 1)*feps/fsig)*prim[IPR]/prim[IDN]);
 }
