@@ -8,38 +8,6 @@
 // molecule index
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
 
-inline Real SatVaporPresIdeal(Real t, Real p3, Real beta, Real delta) {
-  return p3*exp((1. - 1./t)*beta - delta*log(t));
-}
-
-// alpha = L/cv evaluated at current temperature
-inline Real GasCloudIdeal(Real const prim[], int iv, int ic,
-  Real p3, Real t3, Real alpha, Real beta, Real delta)
-{
-  Real xv = prim[iv];
-  Real xc = prim[ic];
-  Real t = prim[IDN]/t3;
-  Real s = SatVaporPresIdeal(t,p3,beta,delta)/prim[IPR];
-
-  // if saturation vapor pressure is larger than the total pressure
-  // evaporate all condensates
-  if (s > 1.) return -xc;
-
-  Real g = 1.;
-  for (int n = ICD; n < ICD + NVAPOR; ++n) g -= prim[n];
-  g -= xv;
-
-  Real s1 = s/(1. - s);
-  Real rate = (xv - s1*g)/(1. + alpha*g*(beta/t - delta)*s1/(1. - s));
-
-  // condensate at most xv vapor
-  if (rate > 0.) rate = std::min(rate, xv);
-
-  // evaporate at most xc cloud
-  if (rate < 0.) rate = std::max(rate, -xc);
-  return rate;
-}
-
 void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
 {
   std::stringstream msg;

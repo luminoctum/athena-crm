@@ -12,26 +12,27 @@
 #include "../microphysics/microphysics.hpp"
 
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
+Real grav;
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
-  AllocateUserOutputVariables(2);
+  AllocateUserOutputVariables(4);
   SetUserOutputVariableName(0, "temp");
-  SetUserOutputVariableName(1, "pot_temp");
+  SetUserOutputVariableName(1, "theta");
+  SetUserOutputVariableName(2, "thetav");
+  SetUserOutputVariableName(3, "MSE");
 }
 
 void MeshBlock::UserWorkInLoop()
 {
   // calculate temperature
   Real p0 = 1.E5;
-  Real gamma = peos->GetGamma();
-
-  pmicro->CalculateTemperature(phydro->u);
 
   for (int i = is; i <= ie; ++i) {
-    Real pres = phydro->w(IPR,i);
-    user_out_var(0,i) = pmicro->T(i);
-    user_out_var(1,i) = pmicro->T(i)*pow(p0/pres, (gamma - 1.)/gamma);
+    user_out_var(0,i) = pmicro->Temp(phydro->w, i);
+    user_out_var(1,i) = pmicro->Theta(p0, phydro->w, i);
+    user_out_var(2,i) = pmicro->Thetav(p0, phydro->w, i);
+    user_out_var(3,i) = pmicro->MSE(grav, phydro->w, i);
   }
 
   /* test whether the result will change if I add back all the condensates
@@ -48,7 +49,7 @@ void MeshBlock::UserWorkInLoop()
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
-  Real grav = -phydro->psrc->GetG1();
+  grav = -phydro->psrc->GetG1();
   Real gamma = peos->GetGamma();
   Real Rd = pmicro->GetRd();
   Real cpd = Rd*gamma/(gamma - 1.);
@@ -59,7 +60,18 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real qH2O = pin->GetReal("problem", "qH2O");
   Real qNH3 = pin->GetReal("problem", "qNH3");
 
-  Real prim[NHYDRO];
+  int i0 = _locate(pcoord->x1v.data(), 0., pcoord->x1v.GetSize());
+
+  std::cout << i0 << std::endl;
+  std::cout << pcoord->x1v(i0) << std::endl;
+
+  for (int n = 0; n < NHYDRO; ++n) phydro->w(n,i0) = 0.;
+  phydro->w(iH2O,i0) = qH2O;
+  phydro->w(iNH3,i0) = qNH3;
+
+  pmicro->DryAdiabat(phydro->w, T0, P0, grav, ks, js, i0, is, ie, false);
+
+  /*Real prim[NHYDRO];
   for (int n = 0; n < NHYDRO; ++n) prim[n] = 0.;
   prim[iNH3] = qNH3;
   prim[iH2O] = qH2O;
@@ -82,7 +94,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       mu += phydro->w(n,i)*(1./pmicro->GetMassRatio(n) - 1.);
 
     phydro->w(IDN,i) = phydro->w(IPR,i)/(Rd*temp*mu);
-  }
+  }*/
 
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 

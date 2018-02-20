@@ -148,6 +148,81 @@ void Microphysics::CalculateTemperature(AthenaArray<Real> const& u)
       }
 }
 
+Real Microphysics::Chi(AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real gamma = pmy_block_->peos->GetGamma();
+  Real feps = 1., fsig = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n) {
+    feps -= w(n,k,j,i);
+    fsig += w(n,k,j,i)*(rcp_[n] - 1.);
+  }
+  for (int n = 1; n < 1 + NVAPOR; ++n) {
+    feps += w(n,k,j,i)*(1./eps_[n] - 1.);
+    fsig += w(n,k,j,i)*(rcp_[n] - 1.);
+  }
+  return (gamma - 1.)/gamma*feps/fsig;
+}
+
+Real Microphysics::Cp(AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real gamma = pmy_block_->peos->GetGamma();
+  Real fsig = 1.;
+  for (int n = 1; n < ITR; ++n)
+    fsig += w(n,k,j,i)*(rcp_[n] - 1.);
+  return gamma/(gamma - 1.)*Rd_*fsig;
+}
+
+Real Microphysics::Cv(AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real gamma = pmy_block_->peos->GetGamma();
+  Real fsig = 1.;
+  for (int n = 1; n < ITR; ++n)
+    fsig += w(n,k,j,i)*(rcv_[n] - 1.);
+  return 1./(gamma - 1.)*Rd_*fsig;
+}
+
+Real Microphysics::Tempv(AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  return w(IPR,k,j,i)/(w(IDN,k,j,i)*Rd_);
+}
+
+Real Microphysics::Temp(AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real feps = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    feps -= w(n,k,j,i);
+  for (int n = 1; n < 1 + NVAPOR; ++n)
+    feps += w(n,k,j,i)*(1./eps_[n] - 1.);
+  return Tempv(w,i,j,k)/feps;
+}
+
+Real Microphysics::Theta(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real chi = Chi(w,i,j,k);
+  Real temp = Temp(w,i,j,k);
+  return temp*pow(p0/w(IPR,k,j,i), chi);
+}
+
+Real Microphysics::Thetav(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real feps = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    feps -= w(n,k,j,i);
+  for (int n = 1; n < 1 + NVAPOR; ++n)
+    feps += w(n,k,j,i)*(1./eps_[n] - 1.);
+
+  return Theta(p0,w,i,j,k)*feps;
+}
+
+Real Microphysics::MSE(Real grav, AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Coordinates *pcoord = pmy_block_->pcoord;
+  Real LE = 0.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    LE += latent_[n]*w(n,k,j,i);
+  return Cp(w,i,j,k)*Temp(w,i,j,k) + LE + grav*pcoord->x1v(i);
+}
+
 // Dropping Precipitation
 #if PRECIPITATION_ENABLED
 void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,

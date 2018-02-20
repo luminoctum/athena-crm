@@ -128,6 +128,19 @@ File changed:
 * src/microphysics/jupiter_microphysics.cpp
 * src/task_list/time_integrator.cpp
 
+17. add dry adiabatic subroutine
+
+File changed:
+* src/hydro/new_blockdt.cpp
+* src/microphysics/jupiter_microphysics.cpp
+* src/microphysics/microphsics.cpp
+* src/microphysics/microphsics.hpp
+* src/pgen/jad.cpp
+* src/pgen/jcrm.cpp
+
+File added:
+* src/src/microphysics/dry_adiabat.cpp
+
 ## Known bugs (but didn't have time to correct it)
 1. flip_across_pole_hydro
 Only works with standard hydro
