@@ -14,7 +14,7 @@
 
 // molecules
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
-Real friction, heating, grav, P0;
+Real friction, heating, grav, termv, P0, T0, ptop, pbot;
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
@@ -40,7 +40,6 @@ void MeshBlock::UserWorkInLoop()
 void JupiterForcing(MeshBlock *pmb, Real const time, Real const dt,
     AthenaArray<Real> const &w, AthenaArray<Real> const &bcc, AthenaArray<Real> &u)
 {
-  Real p0 = 0.5E5;
   for (int k = pmb->ks; k <= pmb->ke; ++k)
     for (int j = pmb->js; j <= pmb->je; ++j) {
       //u(IM1,k,j,i) += - dt*friction*w(IV1,k,j,i)*w(IDN,k,j,i); 
@@ -53,10 +52,17 @@ void JupiterForcing(MeshBlock *pmb, Real const time, Real const dt,
         Real rho = w(IDN,k,j,i);
 
         // radiative cooling
-        if (w(IPR,k,j,i) < p0) 
+        if (w(IPR,k,j,i) < 0.5E5 && w(IPR,k,j,i) > ptop) 
           u(IEN,k,j,i) += heating*rho*dt;
 
-        // sponge layer
+        // falling hydrometers
+        Real qp = 0.;
+        for (int n = 0; n < NVAPOR; ++n)
+          qp += w(ITR + n,k,j,i);
+        u(IM1,k,j,i) += -dt*rho*qp*grav;
+        u(IEN,k,j,i) += -dt*rho*qp*grav*termv;
+
+        // sponge layerprim
         //u(IM1,k,j,i) -= dt*rho*v1*pow(p0/w(IPR,k,j,i),2)/friction;
         //u(IM2,k,j,i) -= dt*rho*v2*pow(p0/w(IPR,k,j,i),2)/friction;
       }
@@ -71,11 +77,14 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
   grav = -phydro->psrc->GetG1();
+  termv = pmicro->GetTerminalVelocity();
   friction = pin->GetReal("problem", "friction");
   heating = pin->GetReal("problem", "heating");
   P0 = pin->GetReal("problem", "P0");
+  T0 = pin->GetReal("problem", "T0");
+  ptop = pin->GetReal("problem", "ptop");
+  pbot = pin->GetReal("problem", "pbot");
 
-  Real T0 = pin->GetReal("problem", "T0");
   Real qH2O = pin->GetReal("problem", "qH2O");
   Real qNH3 = pin->GetReal("problem", "qNH3");
 
@@ -86,7 +95,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   phydro->w(iH2O,ks,js,i0) = qH2O;
   phydro->w(iNH3,ks,js,i0) = qNH3;
 
-  pmicro->DryAdiabat(phydro->w, T0, P0, grav, ks, js, i0, is, ie, false);
+  pmicro->DryAdiabat(phydro->w, T0, P0, grav, ks, js, i0, is, ie, ptop, pbot);
 
   Real kx = 20.*(PI)/(pmy_mesh->mesh_size.x1max - pmy_mesh->mesh_size.x1min);
   Real ky = 20.*(PI)/(pmy_mesh->mesh_size.x2max - pmy_mesh->mesh_size.x2min);

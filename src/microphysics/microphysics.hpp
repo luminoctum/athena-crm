@@ -1,5 +1,6 @@
 #ifndef MICROPHYSICS_HPP
 #define MICROPHYSICS_cPP
+#include <cfloat>
 
 // Athena headers
 #include "../mesh/mesh.hpp"
@@ -43,7 +44,7 @@ public:
   Real Thetav(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real MSE(Real grav, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-    int k, int j, int i0, int is, int ie, bool isothermal = false) const;
+    int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
 
   // state variables
   AthenaArray<Real> T, P;

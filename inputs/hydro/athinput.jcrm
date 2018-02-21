@@ -1,0 +1,81 @@
+<comment>
+problem   = Jupiter's adaibatic profile
+configure = --prob=jcrm --nvapor=2 --flux=lmars --order=weno5 -precip -netcdf -mpi
+
+<job>
+problem_id  = jcrm # problem ID: basename of output filenames
+
+<output1>
+file_type   = hst
+dt          = 1200.
+
+<output2>
+file_type   = rst
+dt          = 86400.
+
+<output3>
+file_type   = netcdf      # Tabular data dump
+variable    = prim        # variables to be output
+dt          = 1200.       # time increment between outputs
+
+<output4>
+file_type   = netcdf
+variable    = uov
+dt          = 1200.
+
+<time>
+cfl_number  = 0.4       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim        = -1        # cycle limit
+tlim        = 20.E5      # time limit
+
+<mesh>
+nx1         = 80  # Number of zones in X1-direction
+#nx1         = 40  # Number of zones in X1-direction
+x1min       = -320.E3      # minimum value of X1
+x1max       = 80.E3       # maximum value of X1
+ix1_bc      = reflecting  # Inner-X1 boundary condition flag
+ox1_bc      = reflecting  # Outer-X1 boundary condition flag
+
+nx2         = 320 # Number of zones in X2-direction
+#nx2         = 160 # Number of zones in X2-direction
+x2min       = 0.        # minimum value of X2
+x2max       = 1600.E3     # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -0.5      # minimum value of X3
+x3max       = 0.5       # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flag
+
+<meshblock>
+nx1         = 80
+#nx1         = 40
+nx2         = 20
+nx3         = 1
+
+<hydro>
+gamma       = 1.42   # gamma = C_p/C_v
+grav_acc1   = -24.79
+
+<microphysics>
+ncycle      = 2
+Rd          = 3777.
+eps         = 8.18  7.72
+t3          = 273.16 195.4
+p3          = 611.7 6060.
+beta        = 22.98 20.64 0.52 1.43
+autoc       = 4000.
+termv       = -10.
+evapr       = 1.E-6
+
+<problem>
+P0          = 1.E5
+T0          = 167.
+ptop        = 0.1E5
+pbot        = 150.E5
+heating     = -0.5
+friction    = 10.E5
+qH2O        = 0.04
+qNH3        = 0.0027

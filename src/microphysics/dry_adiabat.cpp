@@ -6,7 +6,7 @@
 #include "microphysics.hpp"
 
 void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-  int k, int j, int i0, int is, int ie, bool isothermal) const
+  int k, int j, int i0, int is, int ie, Real ptop, Real pbot) const
 {
   Coordinates *pcoord = pmy_block_->pcoord;
   // mass to molar mixing ratio
@@ -69,7 +69,7 @@ void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
     w(IDN,k,j,i) = prim[IPR]/(Rd_*Tv0);
 
     chi = Chi(w,i,j,k);
-    if (isothermal) {
+    if (prim[IPR] < ptop) {
       Tv = Tv0;
       prim[IPR] = w(IPR,k,j,i)*exp(-grav*pcoord->dx1v(i)/(Rd_*Tv));
     } else {
@@ -85,14 +85,18 @@ void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
   for (int i = i0; i > is; --i) {
     chi = Chi(w,i,j,k);
     Tv0 = Tempv(w,i,j,k);
-    Tv = Tv0 + chi*grav*pcoord->dx1v(i)/Rd_;
+    if (w(IPR,k,j,i) > pbot) {
+      Tv = Tv0;
+      prim[IPR] = w(IPR,k,j,i)*exp(grav*pcoord->dx1v(i)/(Rd_*Tv));
+    } else {
+      Tv = Tv0 + chi*grav*pcoord->dx1v(i)/Rd_;
+      prim[IPR] = w(IPR,k,j,i)*pow(Tv/Tv0, 1./chi);
+    }
+    prim[IDN] = Tv/Tv0*Temp(w,i,j,k);
 
     // set initial mixing ratio
     for (int n = 1; n < ITR; ++n)
       prim[n] = prim0[n];
-
-    prim[IPR] = w(IPR,k,j,i)*pow(Tv/Tv0, 1./chi);
-    prim[IDN] = Tv/Tv0*Temp(w,i,j,k);
 
     // condensation at this pressure
     for (int n = 1; n < 1 + NVAPOR; ++n) {

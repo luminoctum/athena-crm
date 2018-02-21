@@ -16,6 +16,7 @@ void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
   MeshBlock *pmb = pmy_block_;
   Real gamma = pmb->peos->GetGamma();
 
+  //Real max = 0.;
   for (int k = pmb->ks; k <= pmb->ke; ++k)
     for (int j = pmb->js; j <= pmb->je; ++j)
       for (int i = pmb->is; i <= pmb->ie; ++i)
@@ -30,5 +31,7 @@ void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
           u(nc,k,j,i) -= drho;
           u(np,k,j,i) += drho;
           u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
+          //if (u(nc,k,j,i) > max) max = u(nc,k,j,i);
         }
+  //std::cout << max << std::endl;
 }

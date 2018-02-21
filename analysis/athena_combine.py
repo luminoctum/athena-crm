@@ -75,22 +75,30 @@ def CombineNetcdfFiles(path, outfile = '', no_remove = False):
 
   if len(fields) > 1:
     print('Combining %s' % singles)
-    check_call('cdo merge %s %s.nc' % (singles, outfile), shell = True)
-    for f in singles.split():
-      os.remove(f)
+    #check_call('cdo merge %s %s.nc' % (singles, outfile), shell = True)
+    #for f in singles.split():
+    #  os.remove(f)
   else:
     shutil.move(outfile, '%s.%s.nc' % (outfile, field), '%s.nc' % outfile)
+  print('File processed: %s'% singles)
   print('Finish case "%s", output file is %s.nc' % (case, outfile))
+
+def CleanNetcdfFiles():
+  files1 = glob('*.out?.nc.????')
+  files2 = []
+  for f in files1:
+    print 'cleaning file:', f
+    os.remove(f)
+    if f[:-5] not in files2:
+      files2.append(f[:-5])
+  for f in files2:
+    print 'cleaning file:', f
+    os.remove(f)
+  print 'Done.'
 
 if __name__ == '__main__':
   now = datetime.now()
-  today = '%02d%02d' % (now.month, now.day),
-  files = sort(glob('log.%s?' % today))
-  if len(files) > 1:
-    latest = files[-1].split('.')[-1]
-  else:
-    latest = today + 'a'
-    check_call('touch log.%s' % latest)
+  today = '%02d%02d' % (now.month, now.day)
 
   parser = argparse.ArgumentParser()
   parser.add_argument('-d', '--dir',
@@ -98,13 +106,20 @@ if __name__ == '__main__':
     help = 'directory of the simulation to combine'
     )
   parser.add_argument('-o', '--output',
-    default = latest,
+    default = today,
     help = 'appending additional name to the output'
     )
   parser.add_argument('-n', '--no-remove',
     action = 'store_true',
     help = 'do not remove original files'
     )
+  parser.add_argument('-c', '--clean',
+    action = 'store_true',
+    help = 'clean temporary files'
+    )
   args = vars(parser.parse_args())
 
-  CombineNetcdfFiles(args['dir'], outfile = args['output'], no_remove = args['no_remove'])
+  if args['clean']:
+    CleanNetcdfFiles()
+  else:
+    CombineNetcdfFiles(args['dir'], outfile = args['output'], no_remove = args['no_remove'])
