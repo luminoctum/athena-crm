@@ -28,6 +28,7 @@ void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
           Real t = T(k,j,i)/t3_[ng];
           Real qs = SatVaporPresIdeal(t, p3_[ng], beta_[ng], beta_[nc])/pd*eps_[ng];
           Real qa = u(ng,k,j,i)/u(IDN,k,j,i);
+          if (qs > qs) continue;
 
           Real rate = (qs - qa)/(1. + (gamma - 1)/gamma*_sqr(beta_[ng]/t - beta_[nc])*qs);
           Real drho = std::min(dt*evapr_*rate, u(np,k,j,i));
