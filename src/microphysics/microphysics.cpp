@@ -1,3 +1,5 @@
+#include <algorithm>  // fill
+
 #include "microphysics.hpp"
 #include "../parameter_input.hpp"
 #include "../utils/utils.hpp"
@@ -82,9 +84,6 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   // terminal velocity
   termv_ = pin->GetOrAddReal("microphysics", "termv", -10.);
 
-  // tiny number
-  tiny_number_ = pin->GetOrAddReal("microphysics", "tiny_number", 1.E-20);
-
   // allocate temperature
   int ncells1 = pmb->block_size.nx1 + 2*(NGHOST);
   int ncells2 = 1, ncells3 = 1;
@@ -92,7 +91,9 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   if (pmb->block_size.nx3 > 1) ncells3 = pmb->block_size.nx3 + 2*(NGHOST);
 
   T.NewAthenaArray(ncells3, ncells2, ncells1);
+  P.NewAthenaArray(ncells3, ncells2, ncells1);
   recondense_.NewAthenaArray(NVAPOR,ncells3,ncells2,ncells1);
+  std::fill(recondense_.data(), recondense_.data() + recondense_.GetSize(), true);
 
   /* debug
   std::cout << "eps_ = ";
@@ -124,10 +125,11 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
 Microphysics::~Microphysics()
 {
   T.DeleteAthenaArray();
+  P.DeleteAthenaArray();
   recondense_.DeleteAthenaArray();
 }
 
-void Microphysics::CalculateTemperature(AthenaArray<Real> const& u)
+void Microphysics::CalculateTP(AthenaArray<Real> const& u)
 {
   MeshBlock *pmb = pmy_block_;
   Real gamma = pmy_block_->peos->GetGamma();
@@ -145,6 +147,10 @@ void Microphysics::CalculateTemperature(AthenaArray<Real> const& u)
         for (int n = ICD; n < ICD + NVAPOR; ++n)
           LE += latent_[n]*u(n,k,j,i);
         T(k,j,i) = (u(IEN,k,j,i) - KE - LE)/cv;
+
+        P(k,j,i) = 0.;
+        for (int n = 0; n < 1 + NVAPOR; ++n)
+          P(k,j,i) += Rd_*T(k,j,i)*u(n,k,j,i)/eps_[n];
       }
 }
 

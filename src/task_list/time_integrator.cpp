@@ -563,7 +563,7 @@ enum TaskStatus TimeIntegratorTaskList::ApplyMicrophysics(MeshBlock *pmb, int st
 
   // do microphysics every xx step
   if (pmb->pmy_mesh->ncycle % pmicro->ncycle == 0) {
-    pmicro->CalculateTemperature(ph->u);
+    pmicro->CalculateTP(ph->u);
     if (PRECIPITATION_ENABLED) {
       Real dt = pmb->pmy_mesh->dt*pmicro->ncycle;
       pmicro->Evaporation(ph->u,dt);

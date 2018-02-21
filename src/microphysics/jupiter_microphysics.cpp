@@ -102,8 +102,9 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
         for (int n = 1; n < ITR; ++n)
           u(n,k,j,i) = rho*prim[n]/sum;
 
-        // update temperature
+        // update temperature and pressure
         T(k,j,i) = prim[IDN];
+        P(k,j,i) = prim[IPR];
 
         /* debug recalculate energy
         Real cvd = Rd_/(gamma - 1);
@@ -135,37 +136,55 @@ void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
           Real drho;
           int nc = ICD + n;
           int np = ITR + n;
-          if (u(nc,k,j,i) > tiny_number_) {
-            if (recondense_(n,k,j,i))
-              drho = u(nc,k,j,i);
-            else
-              drho = u(nc,k,j,i)*dt/autoc_;
-            u(nc,k,j,i) -= drho;
-            u(np,k,j,i) += drho;
-            u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
-          }
+          if (recondense_(n,k,j,i))
+            drho = u(nc,k,j,i);
+          else
+            drho = u(nc,k,j,i)*dt/autoc_;
+          u(nc,k,j,i) -= drho;
+          u(np,k,j,i) += drho;
+          u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
         }
 }
 
 void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
 {
   MeshBlock *pmb = pmy_block_;
+  Real gamma = pmb->peos->GetGamma();
 
   for (int k = pmb->ks; k <= pmb->ke; ++k)
     for (int j = pmb->js; j <= pmb->je; ++j)
-      for (int i = pmb->is; i <= pmb->ie; ++i)
+      for (int i = pmb->is; i <= pmb->ie; ++i) {
+        // calculate partial pressure of dry air
+        Real sum = 1.;
+        for (int n = 1; n < 1 + NVAPOR; ++n)
+          sum += u(n,k,j,i)/u(IDN,k,j,i)/eps_[n];
+        Real pd = 1./sum*P(k,j,i);
+
         for (int n = 0; n < NVAPOR; ++n) {
           int ng = 1 + n;
           int nc = ICD + n;
           int np = ITR + n;
           recondense_(n,k,j,i) = false;
-          if (u(nc,k,j,i) < tiny_number_ && u(np,k,j,i) > tiny_number_) {
-            // limit evaporation rate
-            Real h = exp(-t3_[ng]*beta_[ng]/T(k,j,i));
-            Real drho = std::min(dt*evapr_*h, u(np,k,j,i));
-            u(nc,k,j,i) += drho;
-            u(np,k,j,i) -= drho;
-            recondense_(n,k,j,i) = true;
-          }
+
+          Real t = T(k,j,i)/t3_[ng];
+          Real qs = SatVaporPresIdeal(t, p3_[ng], beta_[ng], beta_[nc])/pd*eps_[ng];
+          Real qa = u(ng,k,j,i)/u(IDN,k,j,i);
+          /* debug
+          if (n == 0)
+            std::cout << i << " " << T(k,j,i) << " " << P(k,j,i) << " ";
+          std::cout << qa << " " << qs << " ";
+          if (n == 1)
+            std::cout << std::endl;*/
+          //if (qa > qs) continue;
+
+          Real rate = (qs - qa)/(1. + (gamma - 1)/gamma*_sqr(beta_[ng]/t - beta_[nc])*qs);
+          //Real drho = std::min(dt*evapr_*rate, u(np,k,j,i));
+          Real drho = u(np,k,j,i);
+          u(nc,k,j,i) += drho;
+          u(np,k,j,i) -= drho;
+          u(IEN,k,j,i) += Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
+          recondense_(n,k,j,i) = true;
+
         }
+      }
 }

@@ -28,7 +28,7 @@ public:
   Real GetTerminalVelocity() const {return termv_;}
 
   // microphysics functions
-  void CalculateTemperature(AthenaArray<Real> const& u);
+  void CalculateTP(AthenaArray<Real> const& u);
   void Evaporation(AthenaArray<Real> &u, Real dt);
   void SaturationAdjustment(AthenaArray<Real> &u);
   void Precipitation(AthenaArray<Real> &u, Real dt);
@@ -45,8 +45,8 @@ public:
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
     int k, int j, int i0, int is, int ie, bool isothermal = false) const;
 
-  // temperature
-  AthenaArray<Real> T;
+  // state variables
+  AthenaArray<Real> T, P;
 
 private:
   MeshBlock *pmy_block_;
@@ -62,7 +62,6 @@ private:
   Real termv_;                // terminal velocity
   Real autoc_;                // auto-conversion time
   Real evapr_;                // evaporation rate
-  Real tiny_number_;          // very small number
 
   Real latent_[1+2*NVAPOR];
   Real rcv_[1+2*NVAPOR];
