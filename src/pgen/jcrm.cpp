@@ -14,7 +14,7 @@
 
 // molecules
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
-Real friction, heating, grav;
+Real friction, heating, grav, P0;
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
@@ -27,13 +27,12 @@ void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 
 void MeshBlock::UserWorkInLoop()
 {
-  Real p0 = 1.E5;
   for (int k = ks; k <= ke; ++k)
     for (int j = js; j <= je; ++j)
       for (int i = is; i <= ie; ++i) {
         user_out_var(0,k,j,i) = pmicro->Temp(phydro->w,i,j,k);
-        user_out_var(1,k,j,i) = pmicro->Theta(p0,phydro->w,i,j,k);
-        user_out_var(2,k,j,i) = pmicro->Thetav(p0,phydro->w,i,j,k);
+        user_out_var(1,k,j,i) = pmicro->Theta(P0,phydro->w,i,j,k);
+        user_out_var(2,k,j,i) = pmicro->Thetav(P0,phydro->w,i,j,k);
         user_out_var(3,k,j,i) = pmicro->MSE(grav,phydro->w,i,j,k);
       }
 }
@@ -74,8 +73,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   grav = -phydro->psrc->GetG1();
   friction = pin->GetReal("problem", "friction");
   heating = pin->GetReal("problem", "heating");
+  P0 = pin->GetReal("problem", "P0");
 
-  Real P0 = pin->GetReal("problem", "P0");
   Real T0 = pin->GetReal("problem", "T0");
   Real qH2O = pin->GetReal("problem", "qH2O");
   Real qNH3 = pin->GetReal("problem", "qNH3");
@@ -102,6 +101,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
         // add pertubation
         phydro->w(IVX,k,j,i) = 1.*(ran2(&iseed)-0.5)
           *(1.0+cos(kx*pcoord->x1v(i)))*(1.0+cos(ky*pcoord->x2v(j)))/4.0;
+
+        // diagnostic variables
+        user_out_var(0,k,j,i) = pmicro->Temp(phydro->w,i,j,k);
+        //std::cout << user_out_var(0,k,j,i) << std::endl;
+        user_out_var(1,k,j,i) = pmicro->Theta(P0,phydro->w,i,j,k);
+        user_out_var(2,k,j,i) = pmicro->Thetav(P0,phydro->w,i,j,k);
+        user_out_var(3,k,j,i) = pmicro->MSE(grav,phydro->w,i,j,k);
       }
 
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord,
