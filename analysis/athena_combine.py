@@ -6,9 +6,8 @@ from numpy import sort
 from subprocess import check_call
 
 ## This function requies:
-## 1) ncrcat
+## 1) ncrcat, ncks
 ## 2) mppnccombine
-## 3) cdo
 def CombineNetcdfFiles(path, outfile = '', no_remove = False):
   files = glob(path + '/*.out*.[0-9][0-9][0-9][0-9][0-9].nc')
   cases = []
@@ -46,6 +45,7 @@ def CombineNetcdfFiles(path, outfile = '', no_remove = False):
     outfile = case + '-' + outfile
 
   singles = ''
+  fields = sorted(fields, reverse = True)
   for field in fields:
     for i in range(nb):
       print('Processing field "%s" block "%d" ...' % (field, i))
@@ -75,11 +75,13 @@ def CombineNetcdfFiles(path, outfile = '', no_remove = False):
 
   if len(fields) > 1:
     print('Combining %s' % singles)
-    #check_call('cdo merge %s %s.nc' % (singles, outfile), shell = True)
-    #for f in singles.split():
-    #  os.remove(f)
+    check_call('ncks -A %s' % singles, shell = True)
+    shutil.move(singles.split()[-1], '%s.nc' % outfile)
   else:
-    shutil.move(outfile, '%s.%s.nc' % (outfile, field), '%s.nc' % outfile)
+    shutil.move('%s.%s.nc' % (outfile, field), '%s.nc' % outfile)
+
+  for f in singles.split()[:-1]:
+    os.remove(f)
   print('File processed: %s'% singles)
   print('Finish case "%s", output file is %s.nc' % (case, outfile))
 
