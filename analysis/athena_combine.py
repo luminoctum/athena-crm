@@ -4,11 +4,21 @@ from glob import glob
 from datetime import datetime
 from numpy import sort
 from subprocess import check_call
+from multiprocessing import Pool
+
+def CombineSingleBlock(arglist):
+  path, case, field, outfile, nb, i = arglist
+  print('Processing field "%s" block "%d" ...' % (field, i))
+  files = path + '/' + '%s.block%d.%s.*.nc' % (case, i, field)
+  target = '%s.%s.nc.%04d' % (outfile, field, i)
+  check_call('ncrcat -h %s -o %s' % (files, target), shell = True)
+  check_call('ncatted -O -a %s,%s,%c,%c,%d %s' %
+      ('NumFilesInSet', 'global', 'c', 'i', nb, target), shell = True)
 
 ## This function requies:
 ## 1) ncrcat, ncks
 ## 2) mppnccombine
-def CombineNetcdfFiles(path, outfile = '', no_remove = False):
+def CombineNetcdfFiles(path, outfile = '', no_remove = False, threads = 1):
   files = glob(path + '/*.out*.[0-9][0-9][0-9][0-9][0-9].nc')
   cases = []
   blocks = []
@@ -46,14 +56,12 @@ def CombineNetcdfFiles(path, outfile = '', no_remove = False):
 
   singles = ''
   fields = sorted(fields, reverse = True)
+  pool = Pool(threads)
   for field in fields:
+    arglist = []
     for i in range(nb):
-      print('Processing field "%s" block "%d" ...' % (field, i))
-      files = path + '/' + '%s.block%d.%s.*.nc' % (case, i, field)
-      target = '%s.%s.nc.%04d' % (outfile, field, i)
-      check_call('ncrcat -h %s -o %s' % (files, target), shell = True)
-      check_call('ncatted -O -a %s,%s,%c,%c,%d %s' %
-        ('NumFilesInSet', 'global', 'c', 'i', nb, target), shell = True)
+      arglist.append((path, case, field, outfile, nb, i))
+    pool.map(CombineSingleBlock, arglist)
 
     print('Combining blocks ...')
     if not os.path.exists('mppnccombine'):
@@ -119,9 +127,14 @@ if __name__ == '__main__':
     action = 'store_true',
     help = 'clean temporary files'
     )
+  parser.add_argument('-p', '--threads',
+    default = '4',
+    help = 'number of parallel threads to use'
+    )
   args = vars(parser.parse_args())
 
   if args['clean']:
     CleanNetcdfFiles()
   else:
-    CombineNetcdfFiles(args['dir'], outfile = args['output'], no_remove = args['no_remove'])
+    CombineNetcdfFiles(args['dir'], outfile = args['output'], 
+        no_remove = args['no_remove'], threads = int(args['threads']))
