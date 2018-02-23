@@ -504,7 +504,7 @@ std::string ParameterInput::GetString(std::string block, std::string name)
   // get pointer to node with same block name in linked list of InputBlocks
   pb = GetPtrToBlock(block);
   if (pb == NULL) {
-    msg << "### FATAL ERROR in function [ParameterInput::GetReal]" << std::endl
+    msg << "### FATAL ERROR in function [ParameterInput::GetString]" << std::endl
         << "Block name '" << block << "' not found when trying to set value "
         << "for parameter '" << name << "'";
     throw std::runtime_error(msg.str().c_str());
@@ -513,7 +513,7 @@ std::string ParameterInput::GetString(std::string block, std::string name)
   // get pointer to node with same parameter name in linked list of InputLines
   pl = pb->GetPtrToLine(name);
   if (pl == NULL) {
-    msg << "### FATAL ERROR in function [ParameterInput::GetReal]" << std::endl
+    msg << "### FATAL ERROR in function [ParameterInput::GetString]" << std::endl
         << "Parameter name '" << name << "' not found in block '" << block << "'";
     throw std::runtime_error(msg.str().c_str());
   }

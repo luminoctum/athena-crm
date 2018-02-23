@@ -93,17 +93,18 @@ void Mesh::InitUserMeshData(ParameterInput *pin)
   // get diagnostic output frequency
   InputBlock *pib = pin->pfirst_block;
   while (pib != NULL) {
-    if (pib->block_name.compare(0,6,"output") == 0)
-      if ((pin->GetString(pib->block_name, "file_type") != "hst") &&
-         (pin->GetString(pib->block_name, "file_type") != "rst") &&
-         (pin->GetString(pib->block_name, "variable") == "uov")) {
-        diag_dt = pin->GetReal(pib->block_name, "dt");
-        try {
-          next_diag_time = pin->GetReal(pib->block_name, "next_time");
-        } catch (std::exception const& ex) {
-          next_diag_time = time + diag_dt;
+    if (pib->block_name.compare(0,6,"output") == 0) {
+      try {
+        if (pin->GetString(pib->block_name, "variable") == "uov") {
+          diag_dt = pin->GetReal(pib->block_name, "dt");
+          try {
+            next_diag_time = pin->GetReal(pib->block_name, "next_time");
+          } catch (std::exception const& ex) {
+            next_diag_time = time + diag_dt;
+          }
         }
-      }
+      } catch (std::exception const& ex) {}
+    }
     pib = pib->pnext;
   }
 

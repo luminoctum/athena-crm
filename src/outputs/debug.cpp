@@ -44,21 +44,22 @@ void DebugOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
 {
   MeshBlock *pmb=pm->pblock;
 
-  Real x1min[NHYDRO];
-  Real x2min[NHYDRO];
-  Real x3min[NHYDRO];
-  Real x1max[NHYDRO];
-  Real x2max[NHYDRO];
-  Real x3max[NHYDRO];
-
   struct {
     Real value;
-    Real coord;
-  } lmin[NHYDRO], gmin[NHYDRO], lmax[NHYDRO], gmax[NHYDRO];
+    int rank;
+  } vmin[NHYDRO], vmax[NHYDRO];
+
+  struct {
+    Real x1, x2, x3;
+  } xmin[NHYDRO], xmax[NHYDRO];
 
   for (int n = 0; n < NHYDRO; ++n) {
-    lmin[n].value = FLT_MAX;
-    lmax[n].value = FLT_MIN;
+    vmin[n].value = FLT_MAX;
+    vmin[n].rank = Globals::my_rank;
+    vmax[n].value = FLT_MIN;
+    vmax[n].rank = Globals::my_rank;
+    xmin[n].x1 = xmin[n].x2 = xmin[n].x3 = 0;
+    xmax[n].x1 = xmax[n].x2 = xmax[n].x3 = 0;
   }
 
   // Loop over MeshBlocks
@@ -80,17 +81,17 @@ void DebugOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
       for (int k=pmb->ks; k<=pmb->ke; ++k)
         for (int j=pmb->js; j<=pmb->je; ++j)
           for (int i=pmb->is; i<=pmb->ie; ++i) {
-            if (phydro->w(n,k,j,i) < lmin[n].value) {
-              lmin[n].value = phydro->w(n,k,j,i);
-              x1min[n] = pcoord->x1v(i);
-              x2min[n] = pcoord->x2v(j);
-              x3min[n] = pcoord->x3v(k);
+            if (phydro->w(n,k,j,i) < vmin[n].value) {
+              vmin[n].value = phydro->w(n,k,j,i);
+              xmin[n].x1 = pcoord->x1v(i);
+              xmin[n].x2 = pcoord->x2v(j);
+              xmin[n].x3 = pcoord->x3v(k);
             }
-            if (phydro->w(n,k,j,i) > lmax[n].value) {
-              lmax[n].value = phydro->w(n,k,j,i);
-              x1max[n] = pcoord->x1v(i);
-              x2max[n] = pcoord->x2v(j);
-              x3max[n] = pcoord->x3v(k);
+            if (phydro->w(n,k,j,i) > vmax[n].value) {
+              vmax[n].value = phydro->w(n,k,j,i);
+              xmax[n].x1 = pcoord->x1v(i);
+              xmax[n].x2 = pcoord->x2v(j);
+              xmax[n].x3 = pcoord->x3v(k);
             }
           }
 
@@ -98,24 +99,49 @@ void DebugOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
   }
 
 #ifdef MPI_PARALLEL
-  // Because MPI_MINLOC/MPI_MAXLOC only allows two arguments.
-  // I will call MPI three times, each gets one coordinate
-  // x1 coordinate
-  for (int n = 0; n < NHYDRO; ++n) lmin[n].coord = x1min[n];
-  MPI_Reduce(lmin, gmin, NHYDRO, MPI_ATHENA_2REAL, MPI_MINLOC, 0, MPI_COMM_WORLD);
-  for (int n = 0; n < NHYDRO; ++n) x1min[n] = gmin[n].coord;
+  // gather all nodes and synchronize
+  MPI_Allreduce(MPI_IN_PLACE, vmin, NHYDRO, MPI_ATHENA_REAL_INT, MPI_MINLOC, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, vmax, NHYDRO, MPI_ATHENA_REAL_INT, MPI_MAXLOC, MPI_COMM_WORLD);
 
-  // x2 coordinate
-  for (int n = 0; n < NHYDRO; ++n) lmin[n].coord = x2min[n];
-  MPI_Reduce(lmin, gmin, NHYDRO, MPI_ATHENA_2REAL, MPI_MINLOC, 0, MPI_COMM_WORLD);
-  for (int n = 0; n < NHYDRO; ++n) x2min[n] = gmin[n].coord;
+  // distribute the coordinates of the extreme values to master node
+  MPI_Status status;
+  MPI_Request request[2*NHYDRO];
+  for (int n = 0; n < 2*NHYDRO; ++n)
+    request[n] = MPI_REQUEST_NULL;
 
-  // x3 coordinate
-  for (int n = 0; n < NHYDRO; ++n) lmin[n].coord = x3min[n];
-  MPI_Reduce(lmin, gmin, NHYDRO, MPI_ATHENA_2REAL, MPI_MINLOC, 0, MPI_COMM_WORLD);
-  for (int n = 0; n < NHYDRO; ++n) x3min[n] = gmin[n].coord;
+  // send and receive coordinate for min values
+  for (int n = 0; n < NHYDRO; ++n) {
+    if (Globals::my_rank == 0) {
+      if (Globals::my_rank == vmin[n].rank)
+        continue;
+      else
+        MPI_Irecv(xmin, 3, MPI_ATHENA_REAL, vmin[n].rank, n, MPI_COMM_WORLD, request+n);
+    } else {
+      if (Globals::my_rank == vmin[n].rank)
+        MPI_Isend(xmin, 3, MPI_ATHENA_REAL, 0, n, MPI_COMM_WORLD, request + n);
+      else
+        continue;
+    }
+  }
 
-  // now the root rank has all the extreme values and their coordinates
+  // send and receive coordinate for max values
+  for (int n = 0; n < NHYDRO; ++n) {
+    if (Globals::my_rank == 0) {
+      if (Globals::my_rank == vmax[n].rank)
+        continue;
+      else
+        MPI_Irecv(xmax, 3, MPI_ATHENA_REAL, vmax[n].rank, n<<8, MPI_COMM_WORLD, request+NHYDRO+n);
+    } else {
+      if (Globals::my_rank == vmax[n].rank)
+        MPI_Isend(xmax, 3, MPI_ATHENA_REAL, 0, n<<8, MPI_COMM_WORLD, request+NHYDRO+n);
+      else
+        continue;
+    }
+  }
+
+  // blocks and waits for master node to receive all data
+  for (int n = 0; n < 2*NHYDRO; ++n)
+    MPI_Wait(request+n, &status);
 #endif
 
   // only the master rank writes the file
@@ -123,7 +149,7 @@ void DebugOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
   if (Globals::my_rank == 0) {
     std::string fname;
     fname.assign(output_params.file_basename);
-    fname.append(".debug");
+    fname.append(".dbg");
 
     // open file for output
     FILE *pfile;
@@ -136,37 +162,36 @@ void DebugOutput::WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag)
 
     // If this is the first output, write header
     int iout = 1;
-    if (output_params.file_number == 0)
+    if (output_params.file_number == 0) {
       fprintf(pfile,"# Athena++ debug data\n"); // descriptor is first line
-
-    fprintf(pfile,"# [%d]=time    ", iout++);
-    fprintf(pfile,"[%d]=id        ", iout++);
-    fprintf(pfile,"[%d]=dmin      ", iout++);
-    fprintf(pfile,"[%d]=dmax      ", iout++);
-    fprintf(pfile,"[%d]=x1min     ", iout++);
-    fprintf(pfile,"[%d]=x2min     ", iout++);
-    fprintf(pfile,"[%d]=x3min     ", iout++);
-    fprintf(pfile,"[%d]=x1max     ", iout++);
-    fprintf(pfile,"[%d]=x2max     ", iout++);
-    fprintf(pfile,"[%d]=x3max     ", iout++);
-
-    fprintf(pfile,"\n"); // terminate line
+      fprintf(pfile,"# [%d]=time    ", iout++);
+      fprintf(pfile,"[%d]=id       ", iout++);
+      fprintf(pfile,"[%d]=dmin     ", iout++);
+      fprintf(pfile,"[%d]=dmax     ", iout++);
+      fprintf(pfile,"[%d]=x1min    ", iout++);
+      fprintf(pfile,"[%d]=x2min    ", iout++);
+      fprintf(pfile,"[%d]=x3min    ", iout++);
+      fprintf(pfile,"[%d]=x1max    ", iout++);
+      fprintf(pfile,"[%d]=x2max    ", iout++);
+      fprintf(pfile,"[%d]=x3max    ", iout++);
+      fprintf(pfile,"\n"); // terminate line
+    }
 
     // write debug variables
     for (int n = 0; n < NHYDRO; ++n) {
       if (n == 0)
         fprintf(pfile, output_params.data_format.c_str(), pm->time);
       else
-        fprintf(pfile,"              ");
-      fprintf(pfile, "%14d", n);
-      fprintf(pfile, output_params.data_format.c_str(), gmin[n].value);
-      fprintf(pfile, output_params.data_format.c_str(), gmax[n].value);
-      fprintf(pfile, "%14d", x1min[n]);
-      fprintf(pfile, "%14d", x2min[n]);
-      fprintf(pfile, "%14d", x3min[n]);
-      fprintf(pfile, "%14d", x1max[n]);
-      fprintf(pfile, "%14d", x2max[n]);
-      fprintf(pfile, "%14d", x3max[n]);
+        fprintf(pfile,"             ");
+      fprintf(pfile, " --  %2d  -- ", n);
+      fprintf(pfile, output_params.data_format.c_str(), vmin[n].value);
+      fprintf(pfile, output_params.data_format.c_str(), vmax[n].value);
+      fprintf(pfile, output_params.data_format.c_str(), xmin[n].x1);
+      fprintf(pfile, output_params.data_format.c_str(), xmin[n].x2);
+      fprintf(pfile, output_params.data_format.c_str(), xmin[n].x3);
+      fprintf(pfile, output_params.data_format.c_str(), xmax[n].x1);
+      fprintf(pfile, output_params.data_format.c_str(), xmax[n].x2);
+      fprintf(pfile, output_params.data_format.c_str(), xmax[n].x3);
       fprintf(pfile,"\n");
     }
     fclose(pfile);

@@ -16,8 +16,10 @@
 typedef double Real;
 #ifdef MPI_PARALLEL
 #define MPI_ATHENA_REAL MPI_DOUBLE
+#define MPI_ATHENA_REAL_INT MPI_DOUBLE_INT
 #include <mpi.h>
-extern MPI_Datatype MPI_ATHENA_2REAL;
+// it is not used right now. only a place holder
+extern MPI_Datatype MPI_ATHENA_3REAL;
 #endif
 
 class MeshBlock;
