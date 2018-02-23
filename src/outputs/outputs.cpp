@@ -231,6 +231,8 @@ Outputs::Outputs(Mesh *pm, ParameterInput *pin)
               << "is requested in output block '" << op.block_name << "'" << std::endl;
           throw std::runtime_error(msg.str().c_str());
 #endif
+        } else if (op.file_type.compare("debug") == 0) {
+          pnew_type = new DebugOutput(op);
         } else {
           msg << "### FATAL ERROR in Outputs constructor" << std::endl
               << "Unrecognized file format = '" << op.file_type 

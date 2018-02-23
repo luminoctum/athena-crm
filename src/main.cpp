@@ -40,6 +40,8 @@
 // MPI/OpenMP headers
 #ifdef MPI_PARALLEL
 #include <mpi.h>
+// new MPI type
+MPI_Datatype MPI_ATHENA_2REAL;
 #endif
 
 #ifdef OPENMP_PARALLEL
@@ -85,6 +87,10 @@ int main(int argc, char *argv[])
               << "MPI_Comm_size failed." << std::endl;
     return(0);
   }
+
+  // new MPI types
+  MPI_Type_contiguous(2, MPI_ATHENA_REAL, &MPI_ATHENA_2REAL);
+  MPI_Type_commit(&MPI_ATHENA_2REAL);
 #else
   Globals::my_rank = 0;
   Globals::nranks  = 1;
@@ -453,6 +459,7 @@ int main(int argc, char *argv[])
   delete pouts;
 
 #ifdef MPI_PARALLEL
+  MPI_Type_free(&MPI_ATHENA_2REAL);
   MPI_Finalize();
 #endif
 

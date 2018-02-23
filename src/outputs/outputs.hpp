@@ -96,6 +96,13 @@ protected:
   OutputData *plast_data_;   // ptr to last OutputData in linked list
 };
 
+class DebugOutput: public OutputType {
+public:
+  DebugOutput(OutputParameters oparams);
+  ~DebugOutput() {};
+  void WriteOutputFile(Mesh *pm, ParameterInput *pin, bool flag);
+};
+
 //----------------------------------------------------------------------------------------
 //! \class HistoryFile
 //  \brief derived OutputType class for history dumps
