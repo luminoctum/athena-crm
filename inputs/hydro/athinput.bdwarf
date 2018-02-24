@@ -1,0 +1,80 @@
+<comment>
+problem   = Brown dwarf adaibatic profile
+configure = --prob=bdwarf --nvapor=4 --flux=lmars --order=weno5 -precip -netcdf -mpi
+
+<job>
+problem_id  = bdwarf # problem ID: basename of output filenames
+
+<output1>
+file_type   = hst
+dt          = 20.
+
+<output2>
+file_type   = rst
+dt          = 2000.
+
+<output3>
+file_type   = netcdf      # Tabular data dump
+variable    = prim        # variables to be output
+dt          = 200.       # time increment between outputs
+
+<output4>
+file_type   = netcdf
+variable    = uov
+dt          = 200.
+
+<time>
+cfl_number  = 0.4       # The Courant, Friedrichs, & Lewy (CFL) Number
+nlim        = -1        # cycle limit
+tlim        = 5.E5      # time limit
+
+<mesh>
+nx1         = 80      # Number of zones in X1-direction
+x1min       = -38.E3  # minimum value of X1
+x1max       = 12.E3   # maximum value of X1
+ix1_bc      = reflecting  # Inner-X1 boundary condition flag
+ox1_bc      = reflecting  # Outer-X1 boundary condition flag
+
+nx2         = 320 # Number of zones in X2-direction
+x2min       = 0.        # minimum value of X2
+x2max       = 200.E3 # maximum value of X2
+ix2_bc      = periodic  # Inner-X2 boundary condition flag
+ox2_bc      = periodic  # Outer-X2 boundary condition flag
+
+nx3         = 1         # Number of zones in X3-direction
+x3min       = -0.5      # minimum value of X3
+x3max       = 0.5       # maximum value of X3
+ix3_bc      = periodic  # Inner-X3 boundary condition flag
+ox3_bc      = periodic  # Outer-X3 boundary condition flag
+
+<meshblock>
+nx1         = 80
+nx2         = 20
+nx3         = 1
+
+<hydro>
+gamma       = 1.42 # gamma = C_p/C_v
+grav_acc1   = -1000.
+
+<microphysics>
+ncycle      = 2
+Rd          = 3777.
+eps         = 33.88  35.45 39.54 45.64
+t3          = 900. 1000. 1400. 1700.
+p3          = 0.9211 0.4581 0.3333 10.754
+beta        = 29.12 31.98 39.16 34.5
+autoc       = 400.
+termv       = -10.
+evapr       = 1.E-6
+
+<problem>
+P0          = 1.E5
+T0          = 1000.
+ptop        = 0.01E5
+pbot        = 100.E5
+heating     = -1.
+friction    = 10.E5
+qKCl        = 2.26E-5
+qNa2S       = 1.83E-4
+qMnS        = 6.6E-5
+qMgSiO3     = 8.34E-3
