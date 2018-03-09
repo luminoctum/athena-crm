@@ -30,15 +30,22 @@
 #---------------------------------------------------------------------------------------
 
 # Modules
-import argparse
-import glob
-import re
+import argparse, glob, re, os
 
 # Set template and output filenames
 makefile_input = 'Makefile.in'
 makefile_output = 'Makefile'
 defsfile_input = 'src/defs.hpp.in'
 defsfile_output = 'src/defs.hpp'
+
+#--- Step 0. Read overlay structure if the overlay file exists -------------------------
+overlay = []
+if os.path.isfile('overlay'):
+  with open('overlay', 'r') as file:
+    line = file.readline().split()
+    while line:
+      overlay.append((line[0], line[-1]))
+      line = file.readline().split()
 
 #--- Step 1. Prepare parser, add each of the arguments ---------------------------------
 parser = argparse.ArgumentParser()
@@ -49,6 +56,14 @@ pgen_directory = 'src/pgen/'
 pgen_choices = glob.glob(pgen_directory + '*.cpp')
 # remove 'src/pgen/' prefix and '.cpp' extension from each filename
 pgen_choices = [choice[len(pgen_directory):-4] for choice in pgen_choices]
+
+# add problem files in overlay
+for new_file, old_file in overlay:
+  new = new_file[:-4]
+  old = old_file[:-4]
+  if ('pgen' in old) and not (new in pgen_choices):
+    pgen_choices.append(new)
+
 parser.add_argument('--prob',
     default='shock_tube',
     choices=pgen_choices,
@@ -447,6 +462,12 @@ for key,val in definitions.items():
   defsfile_template = re.sub(r'@{0}@'.format(key), val, defsfile_template)
 for key,val in makefile_options.items():
   makefile_template = re.sub(r'@{0}@'.format(key), val, makefile_template)
+
+# Make overlay substitution
+val = ''
+for new_file, old_file in overlay:
+  val += 'SRC_FILES := $(subst %s,%s,$(SRC_FILES))\n' % (old_file, new_file)
+makefile_template = re.sub(r'@REPLACE_OVERLAY_FILES@', val, makefile_template)
 
 # Write output files
 with open(defsfile_output, 'w') as current_file:
