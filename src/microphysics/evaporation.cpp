@@ -4,6 +4,7 @@
 #include "../hydro/hydro.hpp"
 #include "../math_funcs.hpp"
 #include "microphysics.hpp"
+#include "thermodynamics.hpp"
 
 void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
 {

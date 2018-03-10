@@ -4,6 +4,7 @@
 #include "../hydro/hydro.hpp"
 #include "../math_funcs.hpp"
 #include "microphysics.hpp"
+#include "thermodynamics.hpp"
 
 void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
   int k, int j, int i0, int is, int ie, Real ptop, Real pbot) const

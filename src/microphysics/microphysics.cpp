@@ -229,6 +229,30 @@ Real Microphysics::MSE(Real grav, AthenaArray<Real> const& w, int i, int j, int 
   return Cp(w,i,j,k)*Temp(w,i,j,k) + LE + grav*pcoord->x1v(i);
 }
 
+void Microphysics::SetPrimitive(Real const prim[], AthenaArray<Real>& w,
+  int i, int j, int k) const
+{
+  // set mass mixing ratio
+  Real sum = 1.;
+  for (int n = 1; n < ITR; ++n) {
+    w(n,k,j,i) = prim[n]*eps_[n];
+    sum += prim[n]*(eps_[n] - 1.); 
+  }
+  for (int n = 1; n < ITR; ++n)
+    w(n,k,j,i) /= sum;
+
+  // virtual temperature
+  Real feps = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    feps -= w(n,k,j,i);
+  for (int n = 1; n < 1 + NVAPOR; ++n)
+    feps += w(n,k,j,i)*(1./eps_[n] - 1.);
+  Real Tv = prim[IDN]*feps;
+
+  w(IPR,k,j,i) = prim[IPR];
+  w(IDN,k,j,i) = prim[IPR]/(Rd_*Tv);
+}
+
 // Dropping Precipitation
 #if PRECIPITATION_ENABLED
 void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,

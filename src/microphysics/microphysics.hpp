@@ -1,5 +1,5 @@
 #ifndef MICROPHYSICS_HPP
-#define MICROPHYSICS_cPP
+#define MICROPHYSICS_HPP
 #include <cfloat>
 
 // Athena headers
@@ -43,7 +43,10 @@ public:
   Real Theta(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real Thetav(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real MSE(Real grav, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+  void SetPrimitive(Real const prim[], AthenaArray<Real>& w, int i, int j = 0, int k = 0) const;
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
+    int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
+  void MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
     int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
 
   // state variables
@@ -67,38 +70,5 @@ private:
   Real latent_[1+2*NVAPOR];
   Real rcv_[1+2*NVAPOR];
 };
-
-// frequently used inline functions
-inline Real SatVaporPresIdeal(Real t, Real p3, Real beta, Real delta) {
-  return p3*exp((1. - 1./t)*beta - delta*log(t));
-}
-
-// alpha = L/cv evaluated at current temperature
-inline Real GasCloudIdeal(Real const prim[], int iv, int ic,
-  Real p3, Real t3, Real alpha, Real beta, Real delta)
-{
-  Real xv = prim[iv];
-  Real xc = prim[ic];
-  Real t = prim[IDN]/t3;
-  Real s = SatVaporPresIdeal(t,p3,beta,delta)/prim[IPR];
-
-  // if saturation vapor pressure is larger than the total pressure
-  // evaporate all condensates
-  if (s > 1.) return -xc;
-
-  Real g = 1.;
-  for (int n = ICD; n < ICD + NVAPOR; ++n) g -= prim[n];
-  g -= xv;
-
-  Real s1 = s/(1. - s);
-  Real rate = (xv - s1*g)/(1. + alpha*g*(beta/t - delta)*s1/(1. - s));
-
-  // condensate at most xv vapor
-  if (rate > 0.) rate = std::min(rate, xv);
-
-  // evaporate at most xc cloud
-  if (rate < 0.) rate = std::max(rate, -xc);
-  return rate;
-}
 
 #endif
