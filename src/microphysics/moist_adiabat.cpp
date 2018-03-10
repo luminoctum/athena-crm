@@ -31,9 +31,9 @@ void Microphysics::MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real gra
   for (int n = 0; n < ITR;  ++n)
     rcp[n] = rcp_[n]*eps_[n];
 
-  int isat[1+NVAPOR];
+  int isat1[1+NVAPOR], isat2[1+NVAPOR];
   for (int n = 0; n <= NVAPOR; ++n)
-    isat[n] = 0;
+    isat1[n] = 0;
 
   // equilibrate at i0
   for (int n = 1; n < 1 + NVAPOR; ++n) {
@@ -42,21 +42,25 @@ void Microphysics::MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real gra
     //Real rate = 0.;
     prim1[n] -= rate;
     prim1[nc] += rate;
-    if (rate > 0.) isat[n] = 1;
+    if (rate > 0.) isat1[n] = 1;
   }
+  for (int n = 0; n <= NVAPOR; ++n)
+    isat2[n] = isat1[n];
   SetPrimitive(prim1, w, i0, j, k);
 
   // upward
   for (int i = i0+1; i <= ie; ++i) {
     // RK4 integration 
-    rk4_integrate_z(prim1, isat, rcp, eps_, beta_, p3_, t3_, gamma, grav/Rd_, pcoord->dx1v(i));
+    rk4_integrate_z_adaptive(prim1, isat1, rcp, eps_, beta_, p3_, t3_, gamma,
+      grav/Rd_, pcoord->dx1v(i));
     SetPrimitive(prim1, w, i, j, k);
   }
 
   // downward
   for (int i = i0-1; i >= is; --i) {
     // RK4 integration 
-    rk4_integrate_z(prim2, isat, rcp, eps_, beta_, p3_, t3_, gamma, grav/Rd_, -pcoord->dx1v(i));
+    rk4_integrate_z_adaptive(prim2, isat2, rcp, eps_, beta_, p3_, t3_, gamma,
+      grav/Rd_, -pcoord->dx1v(i));
     SetPrimitive(prim2, w, i, j, k);
   }
 }

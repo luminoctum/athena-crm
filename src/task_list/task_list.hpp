@@ -44,7 +44,7 @@ struct Task {
 //  \brief data and function definitions for task list base class
 
 class TaskList {
-friend class TimeIntegratorTaskList;
+//friend class TimeIntegratorTaskList;
 public:
   TaskList(Mesh *pm);
   ~TaskList();
@@ -57,7 +57,7 @@ public:
   enum TaskListStatus DoAllAvailableTasks(MeshBlock *pmb, int step);
   void DoTaskList(Mesh *pmesh);
 
-private:
+protected:
   Mesh* pmy_mesh_;
   struct Task task_list_[64];
 };
@@ -168,6 +168,22 @@ namespace HydroIntegratorTaskNames {
   const uint64_t AMR_FLAG=1LL<<40;
 
   const uint64_t MICROPHY=1LL<<41;
+};
+
+class SingleColumnTaskList: public TaskList {
+public:
+  SingleColumnTaskList(ParameterInput *pin, Mesh *pm);
+  ~SingleColumnTaskList() {};
+
+  // functions
+  void AddTask(uint64_t id, uint64_t dep);
+
+  enum TaskStatus ConstructAdiabat(MeshBlock *pmb, int step);
+};
+
+namespace SingleColumnTaskNames {
+  const uint64_t NONE = 0;
+  const uint64_t CONST_AD = 1LL << 0;
 };
 
 #endif // TASK_LIST_HPP

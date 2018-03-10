@@ -53,3 +53,37 @@ void rk4_integrate_z(Real prim[], int isat[], Real const rcp[], Real const eps[]
     if (rate > 0.) isat[n] = 1;
   }
 }
+
+void rk4_integrate_z_adaptive(Real prim[], int isat[], Real const rcp[], Real const eps[],
+  Real const beta[], Real const p3[], Real const t3[],
+  Real gamma, Real g_ov_Rd, Real dz, Real ftol)
+{
+  Real prim1[NHYDRO], prim2[NHYDRO];
+  int  isat1[1+NVAPOR], isat2[1+NVAPOR];
+
+  for (int n = 0; n < NHYDRO; ++n) {
+    prim1[n] = prim[n];
+    prim2[n] = prim[n];
+  }
+  for (int n = 0; n < 1+ NVAPOR; ++n) {
+    isat1[n] = isat[n];
+    isat2[n] = isat[n];
+  }
+
+  // trail step
+  rk4_integrate_z(prim1, isat1, rcp, eps, beta, p3, t3, gamma, g_ov_Rd, dz);
+
+  // refined step
+  rk4_integrate_z(prim2, isat2, rcp, eps, beta, p3, t3, gamma, g_ov_Rd, dz/2.);
+  rk4_integrate_z(prim2, isat2, rcp, eps, beta, p3, t3, gamma, g_ov_Rd, dz/2.);
+
+  if (fabs(prim2[IDN] - prim1[IDN]) > ftol) {
+    rk4_integrate_z_adaptive(prim, isat, rcp, eps, beta, p3, t3, gamma, g_ov_Rd, dz/2., ftol/2.);
+    rk4_integrate_z_adaptive(prim, isat, rcp, eps, beta, p3, t3, gamma, g_ov_Rd, dz/2., ftol/2.);
+  } else {
+    for (int n = 0; n < NHYDRO; ++n)
+      prim[n] = prim2[n];
+    for (int n = 0; n < 1+ NVAPOR; ++n)
+      isat[n] = isat2[n];
+  }
+}
