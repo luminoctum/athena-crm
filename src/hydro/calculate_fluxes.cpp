@@ -71,26 +71,10 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
   // decompose pressure to pertubation pressure and hydrostatic pressure
   DecomposePressure(w);
 
-  // set the loop limits
-  jl=js, ju=je, kl=ks, ku=ke;
-  if (MAGNETIC_FIELDS_ENABLED) {
-    if(pmb->block_size.nx2 > 1) {
-      if(pmb->block_size.nx3 == 1) // 2D
-        jl=js-1, ju=je+1, kl=ks, ku=ke;
-      else // 3D
-        jl=js-1, ju=je+1, kl=ks-1, ku=ke+1;
-    }
-  }
-  for (int k=kl; k<=ku; ++k){ 
-#pragma omp for schedule(static)
-    for (int j=jl; j<=ju; ++j){
-
+  for (int k=ks; k<=ke; ++k)
+    for (int j=js; j<=je; ++j) {
       // reconstruct L/R states
-      if (reconstruct_order == 1) {
-        pmb->precon->DonorCellX1(k,j,is,ie+1,w,bcc,wl,wr);
-      } else {
-        pmb->precon->HighResFuncX1(k,j,is,ie+1,w,bcc,wl,wr);
-      }
+      pmb->precon->HighResFuncX1(k,j,is,ie+1,w,bcc,wl,wr);
 
       // add hydrostatic pressure
       for (int i = is; i <= ie + 1; ++i) {
@@ -101,95 +85,31 @@ void Hydro::CalculateFluxes(AthenaArray<Real> &w, FaceField &b,
       // compute fluxes
       RiemannSolver(k,j,is,ie+1,IVX,b1,wl,wr,flx);
 
-      // tracer advection
-      if (NTRACER > 0)
-        TracerAdvection(k,j,is,ie+1,IVX,wl,wr,flx);
-
       // store fluxes
-      if(k>=ks && k<=ke && j>=js && j<=je) {
-        for(int n=0; n<NHYDRO; n++) {
-#pragma simd
-          for(int i=is; i<=ie+1; i++)
-            x1flux(n,k,j,i)=flx(n,i);
-        }
-      }
-
-      // store electric fields, compute weights for GS07 CT algorithm
-      // no correction to the EMFs is required; they are corrected later
-      if (MAGNETIC_FIELDS_ENABLED) {
-        pmb->pcoord->CenterWidth1(k,j,is,ie+1,dxw);
-#pragma simd
-        for (int i=is; i<=ie+1; ++i){
-          ei_x1f(X1E3,k,j,i) = -flx(IBY,i); // flux(IBY) = (v1*b2 - v2*b1) = -EMFZ
-          ei_x1f(X1E2,k,j,i) =  flx(IBZ,i); // flux(IBZ) = (v1*b3 - v3*b1) =  EMFY
-          Real v_over_c = (1024.0)*(pmb->pmy_mesh->dt)*flx(IDN,i)
-                        / (dxw(i)*(wl(IDN,i) + wr(IDN,i)));
-          Real tmp_min = std::min(0.5,v_over_c);
-          w_x1f(k,j,i) = 0.5 + std::max(-0.5,tmp_min);
-        }
-      }
+      for(int n=0; n<NHYDRO; n++)
+        for(int i=is; i<=ie+1; i++)
+          x1flux(n,k,j,i)=flx(n,i);
     }
-  }
 
   // assemble pressure pertubation
   AssemblePressure(w);
 
 //----------------------------------------------------------------------------------------
 // j-direction
-
-  if (pmb->block_size.nx2 > 1) {
-    // set the loop limits
-    il=is, iu=ie, kl=ks, ku=ke;
-    if (MAGNETIC_FIELDS_ENABLED) {
-      if(pmb->block_size.nx3 == 1) // 2D
-        il=is-1, iu=ie+1, kl=ks, ku=ke;
-      else // 3D
-        il=is-1, iu=ie+1, kl=ks-1, ku=ke+1;
-    }
-    for (int k=kl; k<=ku; ++k){
-#pragma omp for schedule(static)
-      for (int j=js; j<=je+1; ++j){
-
+  if (pmb->block_size.nx2 > 1)
+    for (int k=ks; k<=ke; ++k)
+      for (int i=is; i<=ie; ++i) {
         // reconstruct L/R states at j
-        if (reconstruct_order == 1) {
-          pmb->precon->DonorCellX2(k,j,il,iu,w,bcc,wl,wr);
-        } else {
-          pmb->precon->HighResFuncX2(k,j,il,iu,w,bcc,wl,wr);
-        }
+        pmb->precon->HighResFuncX2(i,k,js,je+1,w,bcc,wl,wr);
 
         // compute fluxes at j
-        RiemannSolver(k,j,il,iu,IVY,b2,wl,wr,flx); 
-
-        // tracer advection
-        if (NTRACER > 0)
-          TracerAdvection(k,j,il,iu,IVY,wl,wr,flx);
+        RiemannSolver(i,k,js,je+1,IVY,b2,wl,wr,flx); 
 
         // store fluxes
-        if(k>=ks && k<=ke) {
-          for(int n=0; n<NHYDRO; n++) {
-#pragma simd
-            for(int i=is; i<=ie; i++)
-              x2flux(n,k,j,i)=flx(n,i);
-          }
-        }
-
-        // store electric fields, compute weights for GS07 CT algorithm
-        // no correction to the EMFs is required; they are corrected later
-        if (MAGNETIC_FIELDS_ENABLED) {
-          pmb->pcoord->CenterWidth2(k,j,il,iu,dxw);
-#pragma simd
-          for (int i=il; i<=iu; ++i){
-            ei_x2f(X2E1,k,j,i) = -flx(IBY,i); // flx(IBY) = (v2*b3 - v3*b2) = -EMFX
-            ei_x2f(X2E3,k,j,i) =  flx(IBZ,i); // flx(IBZ) = (v2*b1 - v1*b2) =  EMFZ
-            Real v_over_c = (1024.0)*(pmb->pmy_mesh->dt)*flx(IDN,i)
-                          / (dxw(i)*(wl(IDN,i) + wr(IDN,i)));
-            Real tmp_min = std::min(0.5,v_over_c);
-            w_x2f(k,j,i) = 0.5 + std::max(-0.5,tmp_min);
-          }
-        }
+        for(int n=0; n<NHYDRO; n++)
+          for(int j=js; j<=je+1; j++)
+            x2flux(n,k,j,i)=flx(n,j);
       }
-    }
-  }
 
 //----------------------------------------------------------------------------------------
 // k-direction 

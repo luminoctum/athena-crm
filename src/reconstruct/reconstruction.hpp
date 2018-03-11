@@ -29,13 +29,13 @@ public:
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
 
-  void HighResFuncX2(const int k, const int j,
-    const int il, const int iu,
+  void HighResFuncX2(const int i, const int k,
+    const int jl, const int ju,
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
 
-  void HighResFuncX3(const int k, const int j,
-    const int il, const int iu,
+  void HighResFuncX3(const int j, const int i,
+    const int kl, const int ku,
     const AthenaArray<Real> &q, const AthenaArray<Real> &bcc,
     AthenaArray<Real> &ql, AthenaArray<Real> &qr);
 
