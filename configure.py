@@ -91,7 +91,7 @@ parser.add_argument('--flux',
 # --order=[name] argument
 parser.add_argument('--order',
     default='plm',
-    choices=['plm','weno3','weno5','cp3','cp5'],
+    choices=['plm','weno3','weno5','cp3','cp5','hybrid5'],
     help='select spatial reconstruction algorithm')
 
 # --nvapor=[num] argument
@@ -261,7 +261,7 @@ definitions['RSOLVER'] = makefile_options['RSOLVER_FILE'] = args['flux']
 
 # --order=[name] argument
 definitions['RECONSTRUCT'] = makefile_options['RECONSTRUCT_FILE'] = args['order']
-if args['order'] in ['weno5','cp5']:
+if args['order'] in ['weno5','cp5','hybrid5']:
   definitions['NGHOST_VALUE'] = '3'
 else:
   definitions['NGHOST_VALUE'] = '2'

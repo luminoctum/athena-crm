@@ -100,7 +100,7 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
       Real KE = 0.5*di*(_sqr(u_m1) + _sqr(u_m2) + _sqr(u_m3));
       Real LE = 0., fsig = 1., feps = 1.;
       for (int n = ICD; n < ICD + NVAPOR; ++n) {
-        LE += pmicro->GetLatent(n)*cons(n,k,j,i);
+        LE += -pmicro->GetLatent(n)*cons(n,k,j,i);
         fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
         feps -= prim(n,k,j,i);
       }
@@ -173,7 +173,7 @@ void EquationOfState::PrimitiveToConserved(const AthenaArray<Real> &prim,
       Real KE = 0.5*w_d*(_sqr(w_v1) + _sqr(w_v2) + _sqr(w_v3));
       Real LE = 0., fsig = 1., feps = 1.;
       for (int n = ICD; n < ICD + NVAPOR; ++n) {
-        LE += pmicro->GetLatent(n)*cons(n,k,j,i);
+        LE += -pmicro->GetLatent(n)*cons(n,k,j,i);
         fsig += prim(n,k,j,i)*(pmicro->GetCvRatio(n) - 1.);
         feps -= prim(n,k,j,i);
       }

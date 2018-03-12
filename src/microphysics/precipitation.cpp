@@ -30,7 +30,7 @@ void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
             drho = u(nc,k,j,i)*dt/autoc_;
           u(nc,k,j,i) -= drho;
           u(np,k,j,i) += drho;
-          u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
+          u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) - latent_[nc]*drho;
           //if (u(nc,k,j,i) > max) max = u(nc,k,j,i);
         }
   //std::cout << max << std::endl;

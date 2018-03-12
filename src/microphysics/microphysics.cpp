@@ -70,7 +70,7 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   latent_[0] = 0.;
   for (int n = 1; n < ICD; ++n) {
     latent_[n] = 0.;
-    latent_[n+NVAPOR] = - beta_[n]*Rd_/eps_[n]*t3_[n];
+    latent_[n+NVAPOR] = beta_[n]*Rd_/eps_[n]*t3_[n];
     rcp_[n+NVAPOR] = rcp_[n] + beta_[n+NVAPOR]/eps_[n]*(1. - 1./gamma);
     rcv_[n+NVAPOR] = rcp_[n+NVAPOR]*gamma;
   }
@@ -94,32 +94,6 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   P.NewAthenaArray(ncells3, ncells2, ncells1);
   recondense_.NewAthenaArray(NVAPOR,ncells3,ncells2,ncells1);
   std::fill(recondense_.data(), recondense_.data() + recondense_.GetSize(), true);
-
-  /* debug
-  std::cout << "eps_ = ";
-  for (int n = 0; n < ITR; ++n)
-    std::cout << eps_[n] << " ";
-  std::cout << std::endl;
-
-  std::cout << "beta_ = ";
-  for (int n = 0; n < ITR; ++n)
-    std::cout << beta_[n] << " ";
-  std::cout << std::endl;
-
-  std::cout << "rcp_ = ";
-  for (int n = 0; n < ITR; ++n)
-    std::cout << rcp_[n] << " ";
-  std::cout << std::endl;
-
-  std::cout << "rcv_ = ";
-  for (int n = 0; n < ITR; ++n)
-    std::cout << rcv_[n] << " ";
-  std::cout << std::endl;
-
-  std::cout << "latent_ = ";
-  for (int n = 0; n < ITR; ++n)
-    std::cout << latent_[n] << " ";
-  std::cout << std::endl;*/
 }
 
 Microphysics::~Microphysics()
@@ -145,7 +119,7 @@ void Microphysics::CalculateTP(AthenaArray<Real> const& u)
         }
         KE = 0.5*(_sqr(u(IM1,k,j,i)) + _sqr(u(IM2,k,j,i)) + _sqr(u(IM3,k,j,i)))/rho;
         for (int n = ICD; n < ICD + NVAPOR; ++n)
-          LE += latent_[n]*u(n,k,j,i);
+          LE += -latent_[n]*u(n,k,j,i);
         T(k,j,i) = (u(IEN,k,j,i) - KE - LE)/cv;
 
         P(k,j,i) = 0.;
@@ -187,7 +161,7 @@ Real Microphysics::Cv(AthenaArray<Real> const& w, int i, int j, int k) const
   return 1./(gamma - 1.)*Rd_*fsig;
 }
 
-Real Microphysics::Tempv(AthenaArray<Real> const& w, int i, int j, int k) const
+Real Microphysics::TempV(AthenaArray<Real> const& w, int i, int j, int k) const
 {
   return w(IPR,k,j,i)/(w(IDN,k,j,i)*Rd_);
 }
@@ -199,7 +173,38 @@ Real Microphysics::Temp(AthenaArray<Real> const& w, int i, int j, int k) const
     feps -= w(n,k,j,i);
   for (int n = 1; n < 1 + NVAPOR; ++n)
     feps += w(n,k,j,i)*(1./eps_[n] - 1.);
-  return Tempv(w,i,j,k)/feps;
+  return TempV(w,i,j,k)/feps;
+}
+
+Real Microphysics::ThetaE(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
+{
+  Real gamma = pmy_block_->peos->GetGamma();
+  Real cpd = Rd_*gamma/(gamma - 1.);
+  Real temp = Temp(w,i,j,k);
+  Real pres = w(IPR,k,j,i);
+
+  Real qd = 1.;
+  for (int n = 1; n < ITR; ++n)
+    qd -= w(n,k,j,i);
+
+  Real lv = 0.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    lv += GetLatent(n, temp)*w(n-ICD+1,k,j,i);
+
+  Real st = 1.;
+  for (int n = ICD; n < ICD + NVAPOR; ++n)
+    st += (w(n,k,j,i) + w(n-ICD+1,k,j,i))*(GetCpRatio(n) - 1.);
+  Real lv_ov_cpt = lv/(cpd*st*temp);
+
+  Real chi = Rd_/cpd*qd/st;
+
+  Real xv = 0.;
+  for (int n = 1; n < ICD; ++n)
+    xv += w(n,k,j,i)/qd/eps_[n];
+
+  Real pd = pres/(1. + xv);
+
+  return temp*pow(p0/pd, chi)*exp(lv_ov_cpt);
 }
 
 Real Microphysics::Theta(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
@@ -209,7 +214,7 @@ Real Microphysics::Theta(Real p0, AthenaArray<Real> const& w, int i, int j, int 
   return temp*pow(p0/w(IPR,k,j,i), chi);
 }
 
-Real Microphysics::Thetav(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
+Real Microphysics::ThetaV(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
 {
   Real feps = 1.;
   for (int n = ICD; n < ICD + NVAPOR; ++n)
@@ -225,7 +230,7 @@ Real Microphysics::MSE(Real grav, AthenaArray<Real> const& w, int i, int j, int 
   Coordinates *pcoord = pmy_block_->pcoord;
   Real LE = 0.;
   for (int n = ICD; n < ICD + NVAPOR; ++n)
-    LE += latent_[n]*w(n,k,j,i);
+    LE += -latent_[n]*w(n,k,j,i);
   return Cp(w,i,j,k)*Temp(w,i,j,k) + LE + grav*pcoord->x1v(i);
 }
 

@@ -3,41 +3,33 @@
 // Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
 // Licensed under the 3-clause BSD License, see LICENSE file for details
 //========================================================================================
-//! \file plm.cpp
-//  \brief  piecewise linear reconstruction
+//! \file weno5.cpp
+//  \brief  WENO5 interpolation
 
 // Athena++ headers
 #include "reconstruction.hpp"
 #include "../athena.hpp"
 #include "../athena_arrays.hpp"
+#include "../math_funcs.hpp"
 #include "../hydro/hydro.hpp"
 #include "../mesh/mesh.hpp"
-#include "../coordinates/coordinates.hpp"
+//#include "../coordinates/coordinates.hpp"
 
 // WENO 5 interpolation
 inline Real interp_weno5(Real phim2, Real phim1, Real phi, Real phip1, Real phip2) {
-  Real p0 = (1.0/3.0)*phim2 - (7.0/6.0)*phim1 + (11.0/6.0)*phi;
-  Real p1 = (-1.0/6.0) * phim1 + (5.0/6.0)*phi + (1.0/3.0)*phip1;
-  Real p2 = (1.0/3.0) * phi + (5.0/6.0)*phip1 - (1.0/6.0)*phip2;
+  Real p0 = (1./3.)*phim2 - (7./6.)*phim1 + (11./6.)*phi;
+  Real p1 = (-1./6.)*phim1 + (5./6.)*phi + (1./3.)*phip1;
+  Real p2 = (1./3.)*phi + (5./6.)*phip1 - (1./6.)*phip2;
 
-  Real beta2 = (13.0/12.0 * (phi - 2.0 * phip1 + phip2)*(phi - 2.0 * phip1 + phip2)
-                        + 0.25 * (3.0 * phi - 4.0 * phip1 + phip2)*(3.0 * phi - 4.0 * phip1 + phip2));
-  Real beta1 = (13.0/12.0 * (phim1 - 2.0 * phi + phip1)*(phim1 - 2.0 * phi + phip1)
-                        + 0.25 * (phim1 - phip1)*(phim1 - phip1));
-  Real beta0 = (13.0/12.0 * (phim2 - 2.0 * phim1 + phi)*(phim2 - 2.0 * phim1 + phi)
-                        + 0.25 * (phim2 - 4.0 * phim1 + 3.0 * phi)*(phim2 - 4.0 * phim1 + 3.0 * phi));
+  Real beta0 = 13./12.*_sqr(phim2 - 2.*phim1 + phi) + .25*_sqr(phim2 - 4.*phim1 + 3.*phi);
+  Real beta1 = 13./12.*_sqr(phim1 - 2.*phi + phip1) + .25*_sqr(phim1 - phip1);
+  Real beta2 = 13./12.*_sqr(phi - 2.*phip1 + phip2) + .25*_sqr(3.*phi - 4.*phip1 + phip2);
 
-  Real alpha0 = 0.1/((beta0 + 1e-10) * (beta0 + 1e-10));
-  Real alpha1 = 0.6/((beta1 + 1e-10) * (beta1 + 1e-10));
-  Real alpha2 = 0.3/((beta2 + 1e-10) * (beta2 + 1e-10));
+  Real alpha0 = .1/_sqr(beta0 + 1e-6);
+  Real alpha1 = .6/_sqr(beta1 + 1e-6);
+  Real alpha2 = .3/_sqr(beta2 + 1e-6);
 
-  Real alpha_sum_inv = 1.0/(alpha0 + alpha1 + alpha2);
-
-  Real w0 = alpha0 * alpha_sum_inv;
-  Real w1 = alpha1 * alpha_sum_inv;
-  Real w2 = alpha2 * alpha_sum_inv;
-
-  return w0 * p0 + w1 * p1 + w2 * p2;
+  return (alpha0*p0 + alpha1*p1 + alpha2*p2)/(alpha0 + alpha1 + alpha2);
 };
 
 //----------------------------------------------------------------------------------------

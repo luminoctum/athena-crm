@@ -24,7 +24,9 @@ public:
   Real GetRd() const {return Rd_;}
   Real GetCvRatio(int n) const {return rcv_[n];}
   Real GetCpRatio(int n) const {return rcp_[n];}
-  Real GetLatent(int n) const {return latent_[n];}
+  Real GetLatent(int n, Real temp = 0.) const {
+    return latent_[n] - beta_[n]*Rd_/eps_[n]*temp;
+  }
   Real GetMassRatio(int n) const {return eps_[n];}
   Real GetTerminalVelocity() const {return termv_;}
 
@@ -38,10 +40,11 @@ public:
   Real Chi(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real Cp(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real Cv(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
-  Real Tempv(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+  Real TempV(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real Temp(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real Theta(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
-  Real Thetav(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+  Real ThetaV(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+  Real ThetaE(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real MSE(Real grav, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   void SetPrimitive(Real const prim[], AthenaArray<Real>& w, int i, int j = 0, int k = 0) const;
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,

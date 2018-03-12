@@ -44,7 +44,7 @@ void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
           Real drho = std::min(dt*evapr_*rate, u(np,k,j,i));
           u(nc,k,j,i) += drho;
           u(np,k,j,i) -= drho;
-          u(IEN,k,j,i) += Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) + latent_[nc]*drho;
+          u(IEN,k,j,i) += Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) - latent_[nc]*drho;
           recondense_(n,k,j,i) = true;
         }
       }

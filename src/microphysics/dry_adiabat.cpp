@@ -85,7 +85,7 @@ void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
   // downward
   for (int i = i0; i > is; --i) {
     chi = Chi(w,i,j,k);
-    Tv0 = Tempv(w,i,j,k);
+    Tv0 = TempV(w,i,j,k);
     if (w(IPR,k,j,i) > pbot) {
       Tv = Tv0;
       prim[IPR] = w(IPR,k,j,i)*exp(grav*pcoord->dx1v(i)/(Rd_*Tv));
