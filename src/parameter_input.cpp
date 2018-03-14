@@ -43,6 +43,8 @@
 #include <stdexcept>  // runtime_error
 #include <algorithm>  // transform
 #include <string>     // string
+#include <cstring>    // strtok
+#include <cstdarg>
 
 // Athena headers
 #include "parameter_input.hpp"
@@ -446,6 +448,25 @@ Real ParameterInput::GetReal(std::string block, std::string name)
 
   // Convert string to real and return value
   return (Real)atof(pl->param_value.c_str());
+}
+
+void ParameterInput::GetReals(std::string block, std::string name, ...)
+{
+  std::string str = GetString(block, name);
+  std::string fmt;
+  char *pc, *cstr = new char [str.length() + 1];
+  strcpy(cstr, str.c_str());
+  pc = strtok(cstr, " ");
+  while (pc != NULL) {
+    fmt += "%lf ";
+    pc = strtok(NULL, " ");
+  }
+
+  va_list args;
+  va_start(args, name);
+  vsscanf(str.c_str(), fmt.c_str(), args);
+  va_end(args);
+  delete [] cstr;
 }
 
 //----------------------------------------------------------------------------------------

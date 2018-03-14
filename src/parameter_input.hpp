@@ -76,6 +76,7 @@ public:
   int  GetOrAddInteger(std::string block, std::string name, int value);
   int  SetInteger(std::string block, std::string name, int value);
   Real GetReal(std::string block, std::string name);
+  void GetReals(std::string block, std::string name, ...);
   Real GetOrAddReal(std::string block, std::string name, Real value);
   Real SetReal(std::string block, std::string name, Real value);
   bool GetBoolean(std::string block, std::string name);
