@@ -46,11 +46,13 @@ public:
   Real ThetaV(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real ThetaE(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real MSE(Real grav, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
-  void SetPrimitive(Real const prim[], AthenaArray<Real>& w, int i, int j = 0, int k = 0) const;
+  void Prim2Hydro(Real const prim[], AthenaArray<Real>& w, int i, int j = 0, int k = 0) const;
+  void Hydro2Prim(Real prim[], AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
     int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
   void MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-    int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
+    //int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
+    int is, int ie, int i0, int j = 0, int k = 0, Real ptop = 0., Real pbot = FLT_MAX) const;
 
   // state variables
   AthenaArray<Real> T, P;

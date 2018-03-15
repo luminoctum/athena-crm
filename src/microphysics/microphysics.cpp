@@ -1,6 +1,7 @@
 #include <algorithm>  // fill
 
 #include "microphysics.hpp"
+#include "thermodynamics.hpp"
 #include "../parameter_input.hpp"
 #include "../utils/utils.hpp"
 #include "../mesh/mesh.hpp"
@@ -15,7 +16,7 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
     ncycle = pin->GetOrAddInteger("microphysics", "ncycle", 1);
   } else {
     Rd_ = 0.;
-    ncycle = 0.;
+    ncycle = 0;
   }
 
   Real gamma = pin->GetReal("hydro", "gamma");
@@ -204,7 +205,15 @@ Real Microphysics::ThetaE(Real p0, AthenaArray<Real> const& w, int i, int j, int
 
   Real pd = pres/(1. + xv);
 
-  return temp*pow(p0/pd, chi)*exp(lv_ov_cpt);
+  Real rh = 1.;
+  for (int n = 1; n < ICD; ++n) {
+    Real eta = w(n,k,j,i)/qd/eps_[n];
+    Real pv = pres*eta/(1. + xv);
+    Real esat = SatVaporPresIdeal(temp/t3_[n], p3_[n], beta_[n], beta_[n+NVAPOR]);
+    rh *= pow(pv/esat, -eta*Rd_/(cpd*st));
+  }
+
+  return temp*pow(p0/pd, chi)*exp(lv_ov_cpt)*rh;
 }
 
 Real Microphysics::Theta(Real p0, AthenaArray<Real> const& w, int i, int j, int k) const
@@ -234,7 +243,7 @@ Real Microphysics::MSE(Real grav, AthenaArray<Real> const& w, int i, int j, int 
   return Cp(w,i,j,k)*Temp(w,i,j,k) + LE + grav*pcoord->x1v(i);
 }
 
-void Microphysics::SetPrimitive(Real const prim[], AthenaArray<Real>& w,
+void Microphysics::Prim2Hydro(Real const prim[], AthenaArray<Real>& w,
   int i, int j, int k) const
 {
   // set mass mixing ratio
@@ -256,6 +265,21 @@ void Microphysics::SetPrimitive(Real const prim[], AthenaArray<Real>& w,
 
   w(IPR,k,j,i) = prim[IPR];
   w(IDN,k,j,i) = prim[IPR]/(Rd_*Tv);
+}
+
+void Microphysics::Hydro2Prim(Real prim[], AthenaArray<Real> const& w,
+  int i, int j, int k) const
+{
+  Real sum = 1.;
+  for (int n = 1; n < ITR; ++n) {
+    prim[n] = w(n,k,j,i)/eps_[n];
+    sum += w(n,k,j,i)*(1./eps_[n] - 1.);
+  }
+  for (int n = 1; n < ITR; ++n)
+    prim[n] /= sum;
+
+  prim[IPR] = w(IPR,k,j,i);
+  prim[IDN] = Temp(w,i,j,k);
 }
 
 // Dropping Precipitation

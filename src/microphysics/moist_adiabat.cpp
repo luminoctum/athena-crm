@@ -8,7 +8,8 @@
 #include "thermodynamics.hpp"
 
 void Microphysics::MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-  int k, int j, int i0, int is, int ie, Real ptop, Real pbot) const
+  //int k, int j, int i0, int is, int ie, Real ptop, Real pbot) const
+  int is, int ie, int i0, int j, int k, Real ptop, Real pbot) const
 {
   Coordinates *pcoord = pmy_block_->pcoord;
   Real gamma = pmy_block_->peos->GetGamma();
@@ -46,14 +47,14 @@ void Microphysics::MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real gra
   }
   for (int n = 0; n <= NVAPOR; ++n)
     isat2[n] = isat1[n];
-  SetPrimitive(prim1, w, i0, j, k);
+  Prim2Hydro(prim1, w, i0, j, k);
 
   // upward
   for (int i = i0+1; i <= ie; ++i) {
     // RK4 integration 
     rk4_integrate_z_adaptive(prim1, isat1, rcp, eps_, beta_, p3_, t3_, gamma,
       grav/Rd_, pcoord->dx1v(i));
-    SetPrimitive(prim1, w, i, j, k);
+    Prim2Hydro(prim1, w, i, j, k);
   }
 
   // downward
@@ -61,6 +62,6 @@ void Microphysics::MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real gra
     // RK4 integration 
     rk4_integrate_z_adaptive(prim2, isat2, rcp, eps_, beta_, p3_, t3_, gamma,
       grav/Rd_, -pcoord->dx1v(i));
-    SetPrimitive(prim2, w, i, j, k);
+    Prim2Hydro(prim2, w, i, j, k);
   }
 }
