@@ -21,6 +21,7 @@
 #include "../hydro/hydro.hpp"
 #include "../mesh/mesh.hpp"
 #include "../microphysics/microphysics.hpp"
+#include "../microphysics/thermodynamics.hpp"
 
 enum {iH2O = 1, iH2Oc = 2};
 
@@ -29,11 +30,11 @@ Real p0, grav;
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
   AllocateUserOutputVariables(5);
-  SetUserOutputVariableName(0, "T");
-  SetUserOutputVariableName(1, "Theta");
-  SetUserOutputVariableName(2, "ThetaV");
-  SetUserOutputVariableName(3, "MSE");
-  SetUserOutputVariableName(4, "ThetaE");
+  SetUserOutputVariableName(0, "temp");
+  SetUserOutputVariableName(1, "theta");
+  SetUserOutputVariableName(2, "theta_v");
+  SetUserOutputVariableName(3, "mse");
+  SetUserOutputVariableName(4, "theta_e");
 }
 
 void MeshBlock::UserWorkInLoop()
@@ -60,27 +61,46 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real zr = pin->GetReal("problem", "zr");
   Real dT = pin->GetReal("problem", "dT");
   Real qt = pin->GetReal("problem", "qt");
+  Real p3 = pin->GetReal("microphysics", "p3");
+  Real t3 = pin->GetReal("microphysics", "t3");
 
-  //Real gamma = peos->GetGamma();
-  //Real cpd = gamma/(gamma - 1.)*Rd;
+  Real beta, delta;
+  pin->GetReals("microphysics", "beta", &beta, &delta);
 
-  phydro->w(iH2O,ks,js,is) = qt;
-  pmicro->MoistAdiabat(phydro->w, Ts, p0, grav, ks, js, is, is, ie);
+  Real Rd = pmicro->GetRd();
+  Real gamma = peos->GetGamma();
+  Real cpd = gamma/(gamma - 1.)*Rd;
 
+  // moist adiabat
+  phydro->w(iH2O,js,is) = qt;
+  pmicro->MoistAdiabat(phydro->w, Ts, p0, grav, is, ie, is, js);
+  for (int n = 0; n < NHYDRO; ++n)
+    for (int j = js; j <= je; ++j)
+      for (int i = is; i <= ie; ++i) {
+        phydro->w(n,j,i) = phydro->w(n,js,i);
+        phydro->w(IVX,j,i) = 0.;
+        phydro->w(IVY,j,i) = 0.;
+      }
+
+  // add temperature anomaly
+  Real prim[NHYDRO];
   for (int j = js; j <= je; ++j)
     for (int i = is; i <= ie; ++i) {
       Real x1 = pcoord->x1v(i);
       Real x2 = pcoord->x2v(j);
       Real L = sqrt(_sqr((x2 - xc)/xr) + _sqr((x1 - zc)/zr));
-      for (int n = 0; n < NHYDRO; ++n)
-        phydro->w(n,j,i) = phydro->w(n,js,i);
-      //Real temp = pmicro->Temp(phydro->w,i,j,k);
-      //if (L < 1.)
-      //  temp += dT*_sqr(cos(M_PI*L/2.))*pow(phydro->w(IPR,j,i)/p0, Rd/cpd);
-      //phydro->w(IDN,j,i) = phydro->w(IPR,j,i)/(Rd*temp);
-      //phydro->w(IVX,j,i) = 0.;
-      //phydro->w(IVY,j,i) = 0.;
+      if (L < 1.) {
+        pmicro->Hydro2Prim(prim,phydro->w,i,j);
+        Real theta = pmicro->Theta(p0, phydro->w,i,j);
+        prim[IDN] +=  dT*_sqr(cos(M_PI*L/2.))*pow(prim[IPR]/p0, Rd/cpd)*theta/300.;
+        Real rate = GasCloudIdeal(prim, iH2O, iH2Oc, p3, t3, 0., beta, delta);
+        prim[iH2O] -= rate;
+        prim[iH2Oc] += rate;
+        pmicro->Prim2Hydro(prim,phydro->w,i,j);
+      }
     }
+
+  UserWorkInLoop();
 
   /*for (int j = js; j <= je; ++j)
     for (int i = is; i <= ie; ++i) {
@@ -96,6 +116,5 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       phydro->w(IVY,j,i) = 0.;
     }*/
 
-  UserWorkInLoop();
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 }
