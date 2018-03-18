@@ -4,30 +4,9 @@
 // Licensed under the 3-clause BSD License, see LICENSE file for details
 //========================================================================================
 //! \file straka.cpp
-//  \brief Problem generator for RT instabilty.
+//  \brief Problem generator for a dense sinking bubble
 //
-// Note the gravitational acceleration is hardwired to be 0.1. Density difference is
-// hardwired to be 2.0 in 2D, and is set by the input parameter <problem>/rhoh in 3D
-// (default value is 3.0). This reproduces 2D results of Liska & Wendroff, 3D results of
-// Dimonte et al.
-// 
-// FOR 2D HYDRO:
-// Problem domain should be -1/6 < x < 1/6; -0.5 < y < 0.5 with gamma=1.4 to match Liska
-// & Wendroff. Interface is at y=0; perturbation added to Vy. Gravity acts in y-dirn.
-// Special reflecting boundary conditions added in x2 to improve hydrostatic eqm
-// (prevents launching of weak waves) Atwood number A=(d2-d1)/(d2+d1)=1/3. Options:
-//     iprob = 1  -- Perturb V2 using single mode
-//     iprob != 1 -- Perturb V2 using multiple mode
-//
-// FOR 3D:
-// Problem domain should be -.05 < x < .05; -.05 < y < .05, -.1 < z < .1, gamma=5/3 to
-// match Dimonte et al.  Interface is at z=0; perturbation added to Vz. Gravity acts in
-// z-dirn. Special reflecting boundary conditions added in x3.  A=1/2.  Options:
-//     iprob = 1 -- Perturb V3 using single mode
-//     iprob = 2 -- Perturb V3 using multiple mode
-//     iprob = 3 -- B rotated by "angle" at interface, multimode perturbation
-//
-// REFERENCE: R. Liska & B. Wendroff, SIAM J. Sci. Comput., 25, 995 (2003)
+// REFERENCE: Straka et al., 1993
 //========================================================================================
 
 // Athena++ headers
@@ -43,23 +22,69 @@
 #include "../utils/utils.hpp"
 #include "../globals.hpp"
 #include "../math_funcs.hpp"
+#include "../microphysics/microphysics.hpp"
 
-Real grav, p0, Ts, Rd, cp, K;
+Real K, p0, cp;
+
+void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
+{
+  AllocateUserOutputVariables(2);
+  SetUserOutputVariableName(0, "temp");
+  SetUserOutputVariableName(1, "theta");
+}
+
+void MeshBlock::UserWorkInLoop()
+{
+  for (int j = js; j <= je; ++j)
+    for (int i = is; i <= ie; ++i) {
+      user_out_var(0,j,i) = pmicro->Temp(phydro->w, i, j);
+      user_out_var(1,j,i) = pmicro->Theta(p0, phydro->w, i, j);
+    }
+}
+
+void Diffusion(MeshBlock *pmb, Real const time, Real const dt,
+  AthenaArray<Real> const& w, AthenaArray<Real> const& bcc, AthenaArray<Real> &u)
+{
+  Real dx = pmb->pcoord->dx1f(0);
+  Microphysics *pmicro = pmb->pmicro;
+  for (int j = pmb->js; j <= pmb->je; ++j)
+    for (int i = pmb->is; i <= pmb->ie; ++i) {
+      Real temp = pmicro->Temp(w,i,j);
+      Real theta = pmicro->Theta(p0,w,i,j);
+      Real theta_ip1_j = pmicro->Theta(p0,w,i+1,j);
+      Real theta_im1_j = pmicro->Theta(p0,w,i-1,j);
+      Real theta_i_jp1 = pmicro->Theta(p0,w,i,j+1);
+      Real theta_i_jm1 = pmicro->Theta(p0,w,i,j-1);
+
+      u(IM1,j,i) += dt*K*w(IDN,j,i)/(dx*dx)*(
+        w(IV1,j,i-1) + w(IV1,j,i+1) + w(IV1,j-1,i) + w(IV1,j+1,i) - 4.*w(IV1,j,i));
+      u(IM2,j,i) += dt*K*w(IDN,j,i)/(dx*dx)*(
+        w(IV2,j,i-1) + w(IV2,j,i+1) + w(IV2,j-1,i) + w(IV2,j+1,i) - 4.*w(IV2,j,i));
+      u(IEN,j,i) += dt*K*w(IDN,j,i)/(dx*dx)*cp*temp/theta*(theta_ip1_j + theta_im1_j +
+        theta_i_jp1 + theta_i_jm1 - 4.*theta);
+    }
+}
+
+void Mesh::InitUserMeshData(ParameterInput *pin)
+{
+  EnrollUserExplicitSourceFunction(Diffusion);
+}
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
-  grav = -phydro->psrc->GetG1();
+  Real grav = -phydro->psrc->GetG1();
+  Real gamma = peos->GetGamma();
+  Real Rd = pin->GetReal("microphysics", "Rd");
+  cp = gamma/(gamma - 1.)*Rd;
   p0 = pin->GetReal("problem", "p0");
-  Ts = pin->GetReal("problem", "Ts");
-  Rd = pin->GetReal("problem", "Rd");
-  cp = pin->GetReal("problem", "cp");
-  K = pin->GetReal("problem", "K");
 
+  Real Ts = pin->GetReal("problem", "Ts");
   Real xc = pin->GetReal("problem", "xc");
   Real xr = pin->GetReal("problem", "xr");
   Real zc = pin->GetReal("problem", "zc");
   Real zr = pin->GetReal("problem", "zr");
   Real dT = pin->GetReal("problem", "dT");
+  K  = pin->GetReal("problem", "K");
 
   for (int j = js; j <= je; ++j)
     for (int i = is; i <= ie; ++i) {
@@ -92,5 +117,6 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
     }
   #endif
 
+  UserWorkInLoop();
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 }
