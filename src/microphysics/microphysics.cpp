@@ -11,13 +11,11 @@
 Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
 {
   pmy_block_ = pmb;
-  if (NVAPOR > 0) {
-    Rd_ = pin->GetReal("microphysics", "Rd");
+  Rd_ = pin->GetOrAddReal("microphysics", "Rd", 0.);
+  if (NVAPOR > 0)
     ncycle = pin->GetOrAddInteger("microphysics", "ncycle", 1);
-  } else {
-    Rd_ = 0.;
+  else
     ncycle = 0;
-  }
 
   Real gamma = pin->GetReal("hydro", "gamma");
 
