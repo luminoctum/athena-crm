@@ -21,8 +21,25 @@
 #include "../mesh/mesh.hpp"
 #include "../utils/utils.hpp"
 #include "../globals.hpp"
+#include "../microphysics/microphysics.hpp"
 
 Real grav, p0, Ts, Rd, cp, K;
+
+void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
+{
+  AllocateUserOutputVariables(2);
+  SetUserOutputVariableName(0, "temp");
+  SetUserOutputVariableName(1, "theta");
+}
+
+void MeshBlock::UserWorkInLoop()
+{
+  for (int j = js; j <= je; ++j)
+    for (int i = is; i <= ie; ++i) {
+      user_out_var(0,j,i) = pmicro->Temp(phydro->w, i, j);
+      user_out_var(1,j,i) = pmicro->Theta(p0, phydro->w, i, j);
+    }
+}
 
 void MeshBlock::ProblemGenerator(ParameterInput *pin)
 {
@@ -38,6 +55,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real a = pin->GetReal("problem", "a");
   Real dT = pin->GetReal("problem", "dT");
 
+  bool uniform_bubble = pin->GetOrAddBoolean("problem", "uniform_bubble", false);
+
   for (int j = js; j <= je; ++j)
     for (int i = is; i <= ie; ++i) {
       Real x1 = pcoord->x1v(i);
@@ -47,12 +66,13 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       phydro->w(IPR,j,i) = p0*pow(temp/Ts, cp/Rd);
       if (r <= a)
         temp += dT*pow(phydro->w(IPR,j,i)/p0, Rd/cp);
-      else
+      else if (!uniform_bubble)
         temp += dT*exp(-(r-a)*(r-a)/(s*s))*pow(phydro->w(IPR,j,i)/p0, Rd/cp);
       phydro->w(IDN,j,i) = phydro->w(IPR,j,i)/(Rd*temp);
       phydro->w(IVX,j,i) = 0.;
       phydro->w(IVY,j,i) = 0.;
     }
 
+  UserWorkInLoop();
   peos->PrimitiveToConserved(phydro->w, pfield->bcc, phydro->u, pcoord, is, ie, js, je, ks, ke);
 }

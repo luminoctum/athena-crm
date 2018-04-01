@@ -3,10 +3,10 @@
 // Copyright(C) 2014 James M. Stone <jmstone@princeton.edu> and other code contributors
 // Licensed under the 3-clause BSD License, see LICENSE file for details
 //========================================================================================
-//! \file wicker.cpp
-//  \brief Problem generator for a dry rising bubble
+//! \file bryan.cpp
+//  \brief Problem generator for a moist rising bubble
 //
-// REFERENCE: Wicker and Skamarock, 1998
+// REFERENCE: Bryan and Fritsch, 2002
 //========================================================================================
 
 // Athena++ headers
@@ -26,6 +26,27 @@
 enum {iH2O = 1, iH2Oc = 2};
 
 Real p0, grav;
+
+struct TVSolver {
+  Real temp_v;
+  Real beta;
+  Real delta;
+  Real p3;
+  Real t3;
+  Real eps;
+  Real *prim;
+
+  TVSolver() {}
+  Real operator() (Real temp) {
+    prim[IDN] = temp;
+    Real rate = GasCloudIdeal(prim, iH2O, iH2Oc, p3, t3, 0., beta, delta);
+    prim[iH2O] -= rate;
+    prim[iH2Oc] += rate;
+    Real f1 = 1. - prim[iH2Oc];
+    Real f2 = 1. + (prim[iH2O] + prim[iH2Oc])*(eps - 1.);
+    return temp*f1/f2 - temp_v;
+  }
+};
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
@@ -61,11 +82,12 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   Real zr = pin->GetReal("problem", "zr");
   Real dT = pin->GetReal("problem", "dT");
   Real qt = pin->GetReal("problem", "qt");
-  Real p3 = pin->GetReal("microphysics", "p3");
-  Real t3 = pin->GetReal("microphysics", "t3");
 
-  Real beta, delta;
-  pin->GetReals("microphysics", "beta", &beta, &delta);
+  TVSolver solver;
+  solver.p3 = pin->GetReal("microphysics", "p3");
+  solver.t3 = pin->GetReal("microphysics", "t3");
+  solver.eps = pmicro->GetMassRatio(iH2O);
+  pin->GetReals("microphysics", "beta", &solver.beta, &solver.delta);
 
   Real Rd = pmicro->GetRd();
   Real gamma = peos->GetGamma();
@@ -83,7 +105,7 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       }
 
   // add temperature anomaly
-  Real prim[NHYDRO];
+  Real prim[NHYDRO]; Real temp;
   for (int j = js; j <= je; ++j)
     for (int i = is; i <= ie; ++i) {
       Real x1 = pcoord->x1v(i);
@@ -91,11 +113,20 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
       Real L = sqrt(_sqr((x2 - xc)/xr) + _sqr((x1 - zc)/zr));
       if (L < 1.) {
         pmicro->Hydro2Prim(prim,phydro->w,i,j);
-        Real theta = pmicro->Theta(p0, phydro->w,i,j);
-        prim[IDN] +=  dT*_sqr(cos(M_PI*L/2.))*pow(prim[IPR]/p0, Rd/cpd)*theta/300.;
-        Real rate = GasCloudIdeal(prim, iH2O, iH2Oc, p3, t3, 0., beta, delta);
-        prim[iH2O] -= rate;
-        prim[iH2Oc] += rate;
+        solver.prim = prim;
+        solver.temp_v = pmicro->TempV(phydro->w, i, j)*
+          (dT*_sqr(cos(M_PI*L/2.))/300. + 1.);
+        int err = _root(prim[IDN], prim[IDN] + dT, 1.E-8, &temp, solver);
+        if (err) {
+          std::stringstream msg;
+          msg << "### TVSolver doesn't converge" << std::endl;
+          throw std::runtime_error(msg.str().c_str());
+        }
+        //Real theta = pmicro->Theta(p0, phydro->w,i,j);
+        //prim[IDN] +=  dT*_sqr(cos(M_PI*L/2.))*pow(prim[IPR]/p0, Rd/cpd)*theta/300.;
+        //Real rate = GasCloudIdeal(prim, iH2O, iH2Oc, p3, t3, 0., beta, delta);
+        //prim[iH2O] -= rate;
+        //prim[iH2Oc] += rate;
         pmicro->Prim2Hydro(prim,phydro->w,i,j);
       }
     }
