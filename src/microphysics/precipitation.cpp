@@ -30,8 +30,37 @@ void Microphysics::Precipitation(AthenaArray<Real> &u, Real dt)
             drho = u(nc,k,j,i)*dt/autoc_;
           u(nc,k,j,i) -= drho;
           u(np,k,j,i) += drho;
-          u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*T(k,j,i) - latent_[nc]*drho;
+          u(IEN,k,j,i) -= Rd_/(gamma - 1)*drho*rcv_[nc]*temp_(k,j,i) - latent_[nc]*drho;
           //if (u(nc,k,j,i) > max) max = u(nc,k,j,i);
         }
   //std::cout << max << std::endl;
 }
+
+// Dropping Precipitation
+#if PRECIPITATION_ENABLED
+void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
+  AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
+{
+  Real grav = -psrc->GetG1();
+  Real dp = pmy_block->pmicro->GetDp();
+  //Real tv = -10.;
+  for (int i = il; i <= iu; ++i) {
+    if (ivx == IVX) {
+      Real tv = pmy_block->pmicro->TerminalVelocity(dp, wl(IDN,i) + wr(IDN,i), grav);
+      for (int n = ITR; n < ITR + NVAPOR; ++n) {
+        flx(n,i) = 0.5*((wl(ivx,i) + tv) + fabs(wl(ivx,i) + tv))*wl(n,i)*wl(IDN,i)
+                 + 0.5*((wr(ivx,i) + tv) - fabs(wr(ivx,i) + tv))*wr(n,i)*wr(IDN,i);
+      }
+      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n) {
+        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
+                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
+      }
+    } else {
+      for (int n = ITR; n < ITR + NTRACER; ++n) {
+        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
+                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
+      }
+    }
+  }
+}
+#endif

@@ -28,13 +28,16 @@ public:
     return latent_[n] - beta_[n]*Rd_/eps_[n]*temp;
   }
   Real GetMassRatio(int n) const {return eps_[n];}
-  Real GetTerminalVelocity() const {return termv_;}
+  Real GetDp() const {return Dp_;}
 
   // microphysics functions
   void CalculateTP(AthenaArray<Real> const& u);
   void Evaporation(AthenaArray<Real> &u, Real dt);
   void SaturationAdjustment(AthenaArray<Real> &u);
   void Precipitation(AthenaArray<Real> &u, Real dt);
+  Real TerminalVelocity(Real dm, Real rho, Real grav) {
+    return -1./18.*dm*dm*rhol_*grav/(rho*Kv_);
+  }
 
   // thermodynamics functions
   Real Chi(AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
@@ -46,20 +49,22 @@ public:
   Real ThetaV(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real ThetaE(Real p0, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
   Real MSE(Real grav, AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+
+  // conversion function
   void Prim2Hydro(Real const prim[], AthenaArray<Real>& w, int i, int j = 0, int k = 0) const;
   void Hydro2Prim(Real prim[], AthenaArray<Real> const& w, int i, int j = 0, int k = 0) const;
+
+  // initialization function
   void DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-    int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
+    int is, int ie, int i0, int j = 0, int k = 0, Real ptop = 0., Real pbot = FLT_MAX) const;
   void MoistAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-    //int k, int j, int i0, int is, int ie, Real ptop = 0., Real pbot = FLT_MAX) const;
     int is, int ie, int i0, int j = 0, int k = 0, Real ptop = 0., Real pbot = FLT_MAX) const;
 
-  // state variables
-  AthenaArray<Real> T, P;
 
 private:
   MeshBlock *pmy_block_;
   AthenaArray<bool> recondense_;
+  AthenaArray<Real> temp_, pres_;
 
   Real Rd_;                   // gas constant of dry air
   Real eps_[1+2*NVAPOR];
@@ -68,9 +73,12 @@ private:
   Real t3_[1+NVAPOR];
   Real p3_[1+NVAPOR];
 
-  Real termv_;                // terminal velocity
-  Real autoc_;                // auto-conversion time
-  Real evapr_;                // evaporation rate
+  Real autoc_;  // auto-conversion time
+  Real Kw_;     // mass diffusion coefficient
+  Real Kt_;     // heat diffusion coefficient
+  Real Kv_;     // kinematic viscosity
+  Real Dp_;     // diameter of precipitation particles
+  Real rhol_;   // density of precipitation particles
 
   Real latent_[1+2*NVAPOR];
   Real rcv_[1+2*NVAPOR];

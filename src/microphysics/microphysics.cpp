@@ -77,11 +77,20 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   // auto-conversion time
   autoc_ = pin->GetOrAddReal("microphysics", "autoc", 2000.);
 
-  // evaporation rate
-  evapr_ = pin->GetOrAddReal("microphysics", "evapr", 10.);
+  // mass diffusion coefficient, water(g) - air(g), 25 degree C
+  Kw_ = pin->GetOrAddReal("microphysics", "Kw", 2.8E-5);
 
-  // terminal velocity
-  termv_ = pin->GetOrAddReal("microphysics", "termv", -10.);
+  // heat diffusion coefficient, air, 300 K
+  Kt_ = pin->GetOrAddReal("microphysics", "Kt", 1.9E-5);
+
+  // kinematic viscosity
+  Kv_ = pin->GetOrAddReal("microphysics", "Kv", 1.6E-5);
+
+  // particle diameter
+  Dp_ = pin->GetOrAddReal("microphysics", "Dp", 1.0E-3);
+
+  // particle density
+  rhol_ = pin->GetOrAddReal("microphysics", "rhol", 1.0E3);
 
   // allocate temperature
   int ncells1 = pmb->block_size.nx1 + 2*(NGHOST);
@@ -89,16 +98,16 @@ Microphysics::Microphysics(MeshBlock *pmb, ParameterInput *pin)
   if (pmb->block_size.nx2 > 1) ncells2 = pmb->block_size.nx2 + 2*(NGHOST);
   if (pmb->block_size.nx3 > 1) ncells3 = pmb->block_size.nx3 + 2*(NGHOST);
 
-  T.NewAthenaArray(ncells3, ncells2, ncells1);
-  P.NewAthenaArray(ncells3, ncells2, ncells1);
+  temp_.NewAthenaArray(ncells3, ncells2, ncells1);
+  pres_.NewAthenaArray(ncells3, ncells2, ncells1);
   recondense_.NewAthenaArray(NVAPOR,ncells3,ncells2,ncells1);
   std::fill(recondense_.data(), recondense_.data() + recondense_.GetSize(), true);
 }
 
 Microphysics::~Microphysics()
 {
-  T.DeleteAthenaArray();
-  P.DeleteAthenaArray();
+  temp_.DeleteAthenaArray();
+  pres_.DeleteAthenaArray();
   recondense_.DeleteAthenaArray();
 }
 
@@ -119,11 +128,11 @@ void Microphysics::CalculateTP(AthenaArray<Real> const& u)
         KE = 0.5*(_sqr(u(IM1,k,j,i)) + _sqr(u(IM2,k,j,i)) + _sqr(u(IM3,k,j,i)))/rho;
         for (int n = ICD; n < ICD + NVAPOR; ++n)
           LE += -latent_[n]*u(n,k,j,i);
-        T(k,j,i) = (u(IEN,k,j,i) - KE - LE)/cv;
+        temp_(k,j,i) = (u(IEN,k,j,i) - KE - LE)/cv;
 
-        P(k,j,i) = 0.;
+        pres_(k,j,i) = 0.;
         for (int n = 0; n < 1 + NVAPOR; ++n)
-          P(k,j,i) += Rd_*T(k,j,i)*u(n,k,j,i)/eps_[n];
+          pres_(k,j,i) += Rd_*temp_(k,j,i)*u(n,k,j,i)/eps_[n];
       }
 }
 
@@ -279,29 +288,3 @@ void Microphysics::Hydro2Prim(Real prim[], AthenaArray<Real> const& w,
   prim[IPR] = w(IPR,k,j,i);
   prim[IDN] = Temp(w,i,j,k);
 }
-
-// Dropping Precipitation
-#if PRECIPITATION_ENABLED
-void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
-  AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
-{
-  Real tv = pmy_block->pmicro->GetTerminalVelocity();
-  for (int i = il; i <= iu; ++i) {
-    if (ivx == IVX) {
-      for (int n = ITR; n < ITR + NVAPOR; ++n) {
-        flx(n,i) = 0.5*((wl(ivx,i) + tv) + fabs(wl(ivx,i) + tv))*wl(n,i)*wl(IDN,i)
-                 + 0.5*((wr(ivx,i) + tv) - fabs(wr(ivx,i) + tv))*wr(n,i)*wr(IDN,i);
-      }
-      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n) {
-        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-      }
-    } else {
-      for (int n = ITR; n < ITR + NTRACER; ++n) {
-        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-      }
-    }
-  }
-}
-#endif

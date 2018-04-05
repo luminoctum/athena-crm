@@ -32,7 +32,7 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
           u0 -= beta_[n]*t3_[n]*prim[n+NVAPOR];
         for (int n = 1; n < ITR; ++n)
           cv += (rcv_[n]*eps_[n] - 1.)*prim[n];
-        u0 += 1./(gamma - 1)*cv*T(k,j,i);
+        u0 += 1./(gamma - 1)*cv*temp_(k,j,i);
 
         Real qsig = 1., qeps = 1., qtol = 1.;
         for (int n = 1; n < ICD; ++n) {
@@ -41,8 +41,8 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
           qtol -= prim[n+NVAPOR];
         }
 
-        prim[IDN] = T(k,j,i);
-        prim[IPR] = rho*Rd_*T(k,j,i)*qtol/qeps;
+        prim[IDN] = temp_(k,j,i);
+        prim[IPR] = rho*Rd_*temp_(k,j,i)*qtol/qeps;
 
         int iter = 0, max_iter = 10;
         Real Told = 0.;
@@ -88,7 +88,7 @@ void Microphysics::SaturationAdjustment(AthenaArray<Real> &u)
           u(n,k,j,i) = rho*prim[n]/sum;
 
         // update temperature and pressure
-        T(k,j,i) = prim[IDN];
-        P(k,j,i) = prim[IPR];
+        temp_(k,j,i) = prim[IDN];
+        pres_(k,j,i) = prim[IPR];
       }
 }

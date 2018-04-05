@@ -7,7 +7,7 @@
 #include "thermodynamics.hpp"
 
 void Microphysics::DryAdiabat(AthenaArray<Real>& w, Real T0, Real P0, Real grav,
-  int k, int j, int i0, int is, int ie, Real ptop, Real pbot) const
+  int is, int ie, int i0, int j, int k, Real ptop, Real pbot) const
 {
   Coordinates *pcoord = pmy_block_->pcoord;
   // mass to molar mixing ratio
