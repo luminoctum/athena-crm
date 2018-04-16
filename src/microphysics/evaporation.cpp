@@ -30,10 +30,10 @@ void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
           // the dynamics step. It is possible that some variables might be negative
           // after dynamics.
           // set negative value to zero
-          u(ng,k,j,i) = std::max(0., u(ng,k,j,i));
-          u(nc,k,j,i) = std::max(0., u(nc,k,j,i));
-          u(np,k,j,i) = std::max(0., u(np,k,j,i));
-          if (u(nc,k,j,i) > tiny_number) continue;  // don't evaporate when there is cloud
+          //u(ng,k,j,i) = std::max(0., u(ng,k,j,i));
+          //u(nc,k,j,i) = std::max(0., u(nc,k,j,i));
+          //u(np,k,j,i) = std::max(0., u(np,k,j,i));
+          if ((u(nc,k,j,i) > tiny_number) || (fabs(u(np,k,j,i)) < tiny_number)) continue;  // don't evaporate when there is cloud
 
           Real feps = 1.;
           for (int n = ICD; n < ICD + NVAPOR; ++n)
@@ -49,14 +49,14 @@ void Microphysics::Evaporation(AthenaArray<Real> &u, Real dt)
           if (qa > qs) continue;  // saturated air, usually this is not used
 
           Real rate, LovRT, dmdt;
-          if (qs > 1.) // boiling
+          if (qs > 1.)  // boiling
             rate = u(np,k,j,i)/dt;
           else {
             LovRT = beta_[ng]/t - beta_[nc];
             dmdt = Kw_/_sqr(Dp_)*(qs - qa)/(1. + Kw_/Kt_*qs*_sqr(LovRT)/(beta_[nc] + gamma/(gamma - 1)));
             rate = 12.*u(np,k,j,i)*rho/rhol_*dmdt;
+            //std::cout << qs << " " << qa << " " << u(np,k,j,i) << " " << dmdt << std::endl;
           }
-          //std::cout << qs << " " << qa << " " << LovRT << " " << dmdt << std::endl;
           Real drho = std::min(dt*rate, u(np,k,j,i));
           u(nc,k,j,i) += drho;
           u(np,k,j,i) -= drho;

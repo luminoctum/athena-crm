@@ -14,7 +14,7 @@
 
 // molecules
 enum {iH2O = 1, iNH3 = 2, iH2Oc = 3, iNH3c = 4, iH2Op = 5, iNH3p = 6};
-Real friction, heating, grav, termv, P0, T0, ptop, pbot, diag_dt, next_diag_time;
+Real friction, heating, grav, P0, T0, ptop, pbot, diag_dt, next_diag_time;
 
 void MeshBlock::InitUserMeshBlockData(ParameterInput *pin)
 {
@@ -38,7 +38,7 @@ void MeshBlock::UserWorkInLoop()
         for (int i = is; i <= ie; ++i) {
           user_out_var(0,k,j,i) = pmicro->Temp(phydro->w,i,j,k);
           user_out_var(1,k,j,i) = pmicro->Theta(P0,phydro->w,i,j,k);
-          user_out_var(2,k,j,i) = pmicro->Thetav(P0,phydro->w,i,j,k);
+          user_out_var(2,k,j,i) = pmicro->ThetaV(P0,phydro->w,i,j,k);
           user_out_var(3,k,j,i) = pmicro->MSE(grav,phydro->w,i,j,k);
         }
     next_diag_time += diag_dt;
@@ -48,6 +48,8 @@ void MeshBlock::UserWorkInLoop()
 void JupiterForcing(MeshBlock *pmb, Real const time, Real const dt,
     AthenaArray<Real> const &w, AthenaArray<Real> const &bcc, AthenaArray<Real> &u)
 {
+  Real dp = pmb->pmicro->GetDp();
+
   for (int k = pmb->ks; k <= pmb->ke; ++k)
     for (int j = pmb->js; j <= pmb->je; ++j) {
       //u(IM1,k,j,i) += - dt*friction*w(IV1,k,j,i)*w(IDN,k,j,i); 
@@ -58,17 +60,19 @@ void JupiterForcing(MeshBlock *pmb, Real const time, Real const dt,
              v2 = w(IV2,k,j,i),
              v3 = w(IV3,k,j,i);
         Real rho = w(IDN,k,j,i);
+        //Real tv = pmb->pmicro->TerminalVelocity(dp, rho, grav);
+        Real tv = -20.;
 
         // radiative cooling
         if (w(IPR,k,j,i) < 0.5E5 && w(IPR,k,j,i) > ptop) 
           u(IEN,k,j,i) += heating*rho*dt;
 
-        // falling hydrometers
+        // falling precipitations
         Real qp = 0.;
         for (int n = 0; n < NVAPOR; ++n)
           qp += w(ITR + n,k,j,i);
         u(IM1,k,j,i) += -dt*rho*qp*grav;
-        u(IEN,k,j,i) += -dt*rho*qp*grav*termv;
+        u(IEN,k,j,i) += -dt*rho*qp*grav*tv;
 
         // sponge layerprim
         //u(IM1,k,j,i) -= dt*rho*v1*pow(p0/w(IPR,k,j,i),2)/friction;
@@ -80,8 +84,6 @@ void JupiterForcing(MeshBlock *pmb, Real const time, Real const dt,
 void Mesh::InitUserMeshData(ParameterInput *pin)
 {
   grav = - pin->GetReal("hydro", "grav_acc1");
-  termv = pin->GetReal("microphysics", "termv");
-
   friction = pin->GetReal("problem", "friction");
   heating = pin->GetReal("problem", "heating");
   P0 = pin->GetReal("problem", "P0");
@@ -123,7 +125,8 @@ void MeshBlock::ProblemGenerator(ParameterInput *pin)
   phydro->w(iH2O,ks,js,i0) = qH2O;
   phydro->w(iNH3,ks,js,i0) = qNH3;
 
-  pmicro->DryAdiabat(phydro->w, T0, P0, grav, ks, js, i0, is, ie, ptop, pbot);
+  //pmicro->DryAdiabat(phydro->w, T0, P0, grav, ks, js, i0, is, ie, ptop, pbot);
+  pmicro->DryAdiabat(phydro->w, T0, P0, grav, is, ie, i0, js, ks, ptop);
 
   Real kx = 20.*(PI)/(pmy_mesh->mesh_size.x1max - pmy_mesh->mesh_size.x1min);
   Real ky = 20.*(PI)/(pmy_mesh->mesh_size.x2max - pmy_mesh->mesh_size.x2min);

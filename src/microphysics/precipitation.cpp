@@ -43,24 +43,25 @@ void Hydro::TracerAdvection(int k, int j, int il, int iu, int ivx,
 {
   Real grav = -psrc->GetG1();
   Real dp = pmy_block->pmicro->GetDp();
-  //Real tv = -10.;
+  Real ubar;
+
   for (int i = il; i <= iu; ++i) {
-    if (ivx == IVX) {
-      Real tv = pmy_block->pmicro->TerminalVelocity(dp, wl(IDN,i) + wr(IDN,i), grav);
-      for (int n = ITR; n < ITR + NVAPOR; ++n) {
-        flx(n,i) = 0.5*((wl(ivx,i) + tv) + fabs(wl(ivx,i) + tv))*wl(n,i)*wl(IDN,i)
-                 + 0.5*((wr(ivx,i) + tv) - fabs(wr(ivx,i) + tv))*wr(n,i)*wr(IDN,i);
-      }
-      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n) {
-        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-      }
-    } else {
-      for (int n = ITR; n < ITR + NTRACER; ++n) {
-        flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-                 + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-      }
-    }
+    ubar = 0.5*(wl(ivx,i) + wr(ivx,i));
+    if (ubar > 0.)
+      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n)
+        flx(n,i) = ubar*wl(IDN,i)*wl(n,i);
+    else
+      for (int n = ITR + NVAPOR; n < ITR + NTRACER; ++n)
+        flx(n,i) = ubar*wr(IDN,i)*wr(n,i);
+
+    ubar += (ivx == IVX) && (i != iu) ? -20. : 0;
+    if (ubar > 0.)
+      for (int n = ITR; n < ITR + NVAPOR; ++n)
+        flx(n,i) = ubar*wl(IDN,i)*wl(n,i);
+    else
+      for (int n = ITR; n < ITR + NVAPOR; ++n)
+        flx(n,i) = ubar*wr(IDN,i)*wr(n,i);
   }
+
 }
 #endif

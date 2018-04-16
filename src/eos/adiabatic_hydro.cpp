@@ -77,12 +77,6 @@ void EquationOfState::ConservedToPrimitive(AthenaArray<Real> &cons,
         density += cons(n,k,j,i);
       }
 
-      // correct precipitation
-      if (PRECIPITATION_ENABLED) {
-        for (int n = ITR; n < ITR + NVAPOR; ++n)
-          cons(n,k,j,i) = std::max(0., cons(n,k,j,i));
-      }
-
       // total density
       prim(IDN,k,j,i) = density;
       Real di = 1./density;

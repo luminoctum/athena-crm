@@ -140,9 +140,12 @@ void __attribute__((weak)) Hydro::TracerAdvection(int k, int j, int il, int iu, 
   AthenaArray<Real> const& wl, AthenaArray<Real> const& wr, AthenaArray<Real> &flx)
 {
   for (int i = il; i <= iu; ++i) {
-    for (int n = ITR; n < ITR + NTRACER; ++n) {
-      flx(n,i) = 0.5*(wl(ivx,i) + fabs(wl(ivx,i)))*wl(n,i)*wl(IDN,i)
-               + 0.5*(wr(ivx,i) - fabs(wr(ivx,i)))*wr(n,i)*wr(IDN,i);
-    }
+    Real ubar = 0.5*(wl(ivx,i) + wr(ivx,i));
+    if (ubar > 0.)
+      for (int n = ITR; n < ITR + NTRACER; ++n)
+        flx(n,i) = ubar*wl(IDN,i)*wl(n,i);
+    else
+      for (int n = ITR; n < ITR + NTRACER; ++n)
+        flx(n,i) = ubar*wr(IDN,i)*wr(n,i);
   }
 }
